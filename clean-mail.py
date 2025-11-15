@@ -5,18 +5,18 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-MAIL_SERVER = os.getenv('MAIL_SERVER')
-MAIL_PORT = int(os.getenv('MAIL_PORT', 993))
-MAIL_USER = os.getenv('MAIL_USER')
-MAIL_PASS = os.getenv('MAIL_PASS')
+IMAP_SERVER = os.getenv('IMAP_SERVER')
+IMAP_PORT = int(os.getenv('IMAP_PORT', 993))
+EMAIL_USER = os.getenv('EMAIL_USER')
+EMAIL_PASS = os.getenv('EMAIL_PASS')
 MAILBOX = 'INBOX'
 
 def delete_old_emails(days=10):
     logging.info(f"Start cleaning emails older than {days} days.")
     cutoff_date = (datetime.date.today() - datetime.timedelta(days=days)).strftime("%d-%b-%Y")
     try:
-        mail = imaplib.IMAP4_SSL(MAIL_SERVER, MAIL_PORT)
-        mail.login(MAIL_USER, MAIL_PASS)
+        mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+        mail.login(EMAIL_USER, EMAIL_PASS)
         mail.select(MAILBOX)
         typ, data = mail.search(None, f'BEFORE {cutoff_date}')
         if typ != 'OK':
