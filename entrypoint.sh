@@ -5,9 +5,7 @@ set -e
 : "${SCHEDULE_HOUR:=0}"
 : "${SCHEDULE_DAY:=0}"
 
-# Generate the cron job and run the script for the first time now
-echo "$SCHEDULE_MIN $SCHEDULE_HOUR * * $SCHEDULE_DAY python3 /app/clean_email.py >> /proc/1/fd/1 2>&1" > /etc/crontabs/root
+echo "$SCHEDULE_MIN $SCHEDULE_HOUR * * $SCHEDULE_DAY python3 /app/clean_email.py >> /proc/1/fd/1 2>&1" > /tmp/cronjob
+crontab /tmp/cronjob
 python3 /app/clean_email.py
-
-# Start cron in foreground
-crond -f
+cron -f
