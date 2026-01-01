@@ -39,10 +39,10 @@ Run the container passing environment variables for server, credentials, and sch
 
 ```bash
 docker run -d
--e MAIL_SERVER="imap.server.com"
--e MAIL_PORT=993
--e MAIL_USER="your_username"
--e MAIL_PASS="your_password"
+-e IMAP_SERVER="imap.server.com"
+-e IMAP_PORT=993
+-e EMAIL_USER="your_username"
+-e EMAIL_PASS="your_password"
 -e SCHEDULE_DAY=1
 -e SCHEDULE_HOUR=1
 -e SCHEDULE_MIN=30
@@ -58,6 +58,15 @@ docker run -d
 - `SCHEDULE_MIN`: Minute of the hour (0-59)
 
 The combination above means the cleanup runs every Monday at 01:30 AM.
+
+---
+
+## IMAP Environment Variables
+
+- `IMAP_SERVER`: IMAP server hostname or IP (required)
+- `IMAP_PORT`: IMAP port, defaults to `993` for SSL
+- `EMAIL_USER`: Username for the mailbox to clean (required)
+- `EMAIL_PASS`: Password for the mailbox to clean (required)
 
 ---
 
