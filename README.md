@@ -8,6 +8,7 @@ A Docker container to automatically clean an IMAP email inbox by deleting all em
 
 - Connects to any IMAP email server with specified credentials
 - Deletes emails older than N days (default: 10, configurable by env var or CLI)
+- Optional Telegram notification after each cleanup run (success/failure, deleted count, duration)
 - Detailed logging with INFO and ERROR levels
 - Executes cleanup immediately on the first container start
 - Weekly repeated scheduling using cron inside the container
@@ -44,6 +45,8 @@ docker run -d
 -e EMAIL_USER="your_username"
 -e EMAIL_PASS="your_password"
 -e CLEAN_DAYS=10
+-e TELEGRAM_BOT_TOKEN="123456:ABCDEF"
+-e TELEGRAM_CHAT_ID="123456789"
 -e SCHEDULE_DAY=1
 -e SCHEDULE_HOUR=1
 -e SCHEDULE_MIN=30
@@ -69,6 +72,9 @@ The combination above means the cleanup runs every Monday at 01:30 AM.
 - `EMAIL_USER`: Username for the mailbox to clean (required)
 - `EMAIL_PASS`: Password for the mailbox to clean (required)
 - `CLEAN_DAYS`: Optional number of days to keep emails before deletion (default: `10`)
+- `TELEGRAM_BOT_TOKEN`: Optional bot token used to send post-cleanup notifications
+- `TELEGRAM_CHAT_ID`: Optional target chat id for Telegram notifications
+- `TELEGRAM_TIMEOUT`: Optional timeout in seconds for Telegram API calls (default: `10`)
 
 ---
 
@@ -77,6 +83,14 @@ The combination above means the cleanup runs every Monday at 01:30 AM.
 - Environment variable: set `CLEAN_DAYS` to configure retention in Docker/Compose.
 - Command line: run `python3 clean_email.py --days 30` to override at launch time.
 - If both are set, `--days` takes precedence over `CLEAN_DAYS`.
+
+---
+
+## Telegram Notifications
+
+- If both `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are set, the script sends a message after each run.
+- Success notifications include: retention days, deleted email count, and total duration.
+- Failure notifications include: retention days, duration, and error details.
 
 ---
 
