@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import imaplib
+import json
 import logging
 import os
 import time
@@ -9,87 +10,193 @@ import urllib.request
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-IMAP_SERVER = os.getenv('IMAP_SERVER')
-IMAP_PORT = int(os.getenv('IMAP_PORT', 993))
-EMAIL_USER = os.getenv('EMAIL_USER')
-EMAIL_PASS = os.getenv('EMAIL_PASS')
-EMAIL_ADDRESS = os.getenv('EMAIL_ADDRESS') or EMAIL_USER
-MAILBOX = 'INBOX'
+DEFAULT_MAILBOX = "INBOX"
+
 SEND_TELEGRAM_NOTIFICATIONS = os.getenv("SEND_TELEGRAM_NOTIFICATIONS", "false").strip().lower() in {
     "1", "true", "yes", "on"
 }
 
-def delete_old_emails(days=10):
-    start_time = time.monotonic()
-    deleted_count = 0
-    status = "success"
-    error_message = None
-    mail = None
 
-    logging.info("Start cleaning mailbox %s (user: %s), emails older than %s days.", EMAIL_ADDRESS, EMAIL_USER, days)
-    cutoff_date = (datetime.date.today() - datetime.timedelta(days=days)).strftime("%d-%b-%Y")
+def parse_non_negative_int(value, default_value, context_name):
     try:
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
-        mail.login(EMAIL_USER, EMAIL_PASS)
-        mail.select(MAILBOX)
-        typ, data = mail.search(None, f'BEFORE {cutoff_date}')
-        if typ != 'OK':
-            logging.error("Error searching for emails.")
-            status = "search_error"
-            error_message = "Error searching for emails."
-            return {
-                "status": status,
-                "days": days,
-                "deleted_count": deleted_count,
-                "duration_seconds": time.monotonic() - start_time,
-                "error_message": error_message,
-            }
-        ids = data[0].split()
-        logging.info(f"You have {len(ids)} emails to delete ...")
-        for num in ids:
-            mail.store(num, '+FLAGS', '\\Deleted')
-        deleted_count = len(ids)
-        mail.expunge()
-        logging.info("Cleaning successfully completed.")
-    except Exception as e:
-        logging.error(f"Error during cleaning: {e}")
-        status = "error"
-        error_message = str(e)
-    finally:
-        if mail is not None:
-            try:
-                mail.logout()
-            except Exception:
-                logging.warning("Error while closing IMAP session.")
-
-    return {
-        "status": status,
-        "days": days,
-        "deleted_count": deleted_count,
-        "duration_seconds": time.monotonic() - start_time,
-        "error_message": error_message,
-    }
+        parsed_value = int(value)
+        if parsed_value < 0:
+            raise ValueError
+        return parsed_value
+    except (TypeError, ValueError):
+        logging.warning("Invalid %s value '%s'. Falling back to %s.", context_name, value, default_value)
+        return default_value
 
 
-def resolve_clean_days(cli_days=None):
+def resolve_clean_days(cli_days=None, configured_days=None):
     if cli_days is not None:
         if cli_days < 0:
             logging.warning("Invalid --days value '%s'. Falling back to 10.", cli_days)
             return 10
         return cli_days
 
-    env_days = os.getenv("CLEAN_DAYS")
-    if env_days is None:
+    if configured_days is None:
+        configured_days = os.getenv("CLEAN_DAYS")
+    if configured_days is None:
         return 10
 
+    return parse_non_negative_int(configured_days, 10, "CLEAN_DAYS")
+
+
+def get_config_value(config, *keys, default=None):
+    for key in keys:
+        value = config.get(key)
+        if value not in (None, ""):
+            return value
+    return default
+
+
+def build_single_mailbox_config(cli_days):
+    email_user = os.getenv("EMAIL_USER")
+    return {
+        "imap_server": os.getenv("IMAP_SERVER"),
+        "imap_port": parse_non_negative_int(os.getenv("IMAP_PORT", "993"), 993, "IMAP_PORT"),
+        "email_user": email_user,
+        "email_pass": os.getenv("EMAIL_PASS"),
+        "email_address": os.getenv("EMAIL_ADDRESS") or email_user,
+        "mailbox": os.getenv("MAILBOX", DEFAULT_MAILBOX),
+        "clean_days": resolve_clean_days(cli_days),
+    }
+
+
+def normalize_mailbox_config(raw_config, index, cli_days):
+    email_user = get_config_value(raw_config, "email_user", "EMAIL_USER")
+    clean_days_raw = get_config_value(raw_config, "clean_days", "CLEAN_DAYS")
+
+    return {
+        "imap_server": get_config_value(raw_config, "imap_server", "IMAP_SERVER"),
+        "imap_port": parse_non_negative_int(
+            get_config_value(raw_config, "imap_port", "IMAP_PORT", default=993),
+            993,
+            f"MAILBOX_CONFIGS[{index}].imap_port",
+        ),
+        "email_user": email_user,
+        "email_pass": get_config_value(raw_config, "email_pass", "EMAIL_PASS"),
+        "email_address": get_config_value(raw_config, "email_address", "EMAIL_ADDRESS", default=email_user),
+        "mailbox": get_config_value(raw_config, "mailbox", "MAILBOX", default=DEFAULT_MAILBOX),
+        "clean_days": resolve_clean_days(cli_days, clean_days_raw),
+    }
+
+
+def load_mailbox_configs(cli_days):
+    raw_configs = os.getenv("MAILBOX_CONFIGS")
+    if not raw_configs:
+        return [build_single_mailbox_config(cli_days)]
+
     try:
-        value = int(env_days)
-        if value < 0:
-            raise ValueError
-        return value
-    except ValueError:
-        logging.warning("Invalid CLEAN_DAYS value '%s'. Falling back to 10.", env_days)
-        return 10
+        parsed_configs = json.loads(raw_configs)
+    except json.JSONDecodeError as error:
+        logging.error("Invalid MAILBOX_CONFIGS JSON: %s. Falling back to single mailbox mode.", error)
+        return [build_single_mailbox_config(cli_days)]
+
+    if not isinstance(parsed_configs, list) or not parsed_configs:
+        logging.error("MAILBOX_CONFIGS must be a non-empty JSON array. Falling back to single mailbox mode.")
+        return [build_single_mailbox_config(cli_days)]
+
+    normalized_configs = []
+    for index, raw_config in enumerate(parsed_configs):
+        if not isinstance(raw_config, dict):
+            logging.warning("Skipping MAILBOX_CONFIGS[%s]: entry must be an object.", index)
+            continue
+        normalized_configs.append(normalize_mailbox_config(raw_config, index, cli_days))
+
+    if not normalized_configs:
+        logging.error("MAILBOX_CONFIGS contains no valid entries. Falling back to single mailbox mode.")
+        return [build_single_mailbox_config(cli_days)]
+
+    return normalized_configs
+
+
+def validate_mailbox_config(mailbox_config):
+    missing_fields = []
+    for key in ("imap_server", "email_user", "email_pass"):
+        if not mailbox_config.get(key):
+            missing_fields.append(key)
+    if missing_fields:
+        logging.error(
+            "Skipping mailbox %s due to missing required fields: %s",
+            mailbox_config.get("email_address") or "unknown",
+            ", ".join(missing_fields),
+        )
+        return False
+    return True
+
+
+def delete_old_emails(mailbox_config):
+    start_time = time.monotonic()
+    deleted_count = 0
+    status = "success"
+    error_message = None
+    mail = None
+
+    imap_server = mailbox_config["imap_server"]
+    imap_port = mailbox_config["imap_port"]
+    email_user = mailbox_config["email_user"]
+    email_pass = mailbox_config["email_pass"]
+    email_address = mailbox_config["email_address"] or email_user or "unknown"
+    mailbox_name = mailbox_config["mailbox"]
+    clean_days = mailbox_config["clean_days"]
+
+    logging.info(
+        "Start cleaning mailbox %s (folder: %s, user: %s), emails older than %s days.",
+        email_address,
+        mailbox_name,
+        email_user,
+        clean_days,
+    )
+    cutoff_date = (datetime.date.today() - datetime.timedelta(days=clean_days)).strftime("%d-%b-%Y")
+
+    try:
+        mail = imaplib.IMAP4_SSL(imap_server, imap_port)
+        mail.login(email_user, email_pass)
+        mail.select(mailbox_name)
+        search_status, search_data = mail.search(None, f"BEFORE {cutoff_date}")
+        if search_status != "OK":
+            status = "search_error"
+            error_message = "Error searching for emails."
+            logging.error("%s (%s / %s).", error_message, email_address, mailbox_name)
+            return {
+                "status": status,
+                "days": clean_days,
+                "deleted_count": deleted_count,
+                "duration_seconds": time.monotonic() - start_time,
+                "error_message": error_message,
+                "mailbox_address": email_address,
+                "mailbox_name": mailbox_name,
+            }
+
+        ids = search_data[0].split()
+        logging.info("Mailbox %s (%s): %s emails to delete.", email_address, mailbox_name, len(ids))
+        for num in ids:
+            mail.store(num, "+FLAGS", "\\Deleted")
+        deleted_count = len(ids)
+        mail.expunge()
+        logging.info("Cleaning completed for mailbox %s (%s).", email_address, mailbox_name)
+    except Exception as error:
+        status = "error"
+        error_message = str(error)
+        logging.error("Error during cleaning for mailbox %s (%s): %s", email_address, mailbox_name, error)
+    finally:
+        if mail is not None:
+            try:
+                mail.logout()
+            except Exception:
+                logging.warning("Error while closing IMAP session for mailbox %s.", email_address)
+
+    return {
+        "status": status,
+        "days": clean_days,
+        "deleted_count": deleted_count,
+        "duration_seconds": time.monotonic() - start_time,
+        "error_message": error_message,
+        "mailbox_address": email_address,
+        "mailbox_name": mailbox_name,
+    }
 
 
 def send_telegram_message(message):
@@ -102,11 +209,7 @@ def send_telegram_message(message):
         )
         return False
 
-    try:
-        timeout = int(os.getenv("TELEGRAM_TIMEOUT", "10"))
-    except ValueError:
-        logging.warning("Invalid TELEGRAM_TIMEOUT value. Falling back to 10 seconds.")
-        timeout = 10
+    timeout = parse_non_negative_int(os.getenv("TELEGRAM_TIMEOUT", "10"), 10, "TELEGRAM_TIMEOUT")
 
     api_url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = urllib.parse.urlencode({"chat_id": chat_id, "text": message}).encode("utf-8")
@@ -132,11 +235,14 @@ def notify_cleanup_result(result):
         )
         return
 
-    mailbox_address = EMAIL_ADDRESS or "unknown"
+    mailbox_address = result["mailbox_address"] or "unknown"
+    mailbox_name = result["mailbox_name"] or DEFAULT_MAILBOX
+
     if result["status"] == "success":
         message = (
             "Email cleanup completed.\n"
             f"Mailbox: {mailbox_address}\n"
+            f"Folder: {mailbox_name}\n"
             f"Retention: {result['days']} days\n"
             f"Deleted emails: {result['deleted_count']}\n"
             f"Duration: {result['duration_seconds']:.2f}s"
@@ -145,13 +251,16 @@ def notify_cleanup_result(result):
         message = (
             "Email cleanup failed.\n"
             f"Mailbox: {mailbox_address}\n"
+            f"Folder: {mailbox_name}\n"
             f"Retention: {result['days']} days\n"
             f"Duration: {result['duration_seconds']:.2f}s\n"
             f"Error: {result['error_message'] or 'Unknown error'}"
         )
+
     sent = send_telegram_message(message)
     if sent:
         logging.info("Post-cleanup Telegram notification delivered for mailbox %s.", mailbox_address)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Delete IMAP emails older than N days.")
@@ -162,6 +271,13 @@ if __name__ == "__main__":
         help="Delete emails older than this number of days (default: 10, or CLEAN_DAYS env var).",
     )
     args = parser.parse_args()
-    days = resolve_clean_days(args.days)
-    result = delete_old_emails(days)
-    notify_cleanup_result(result)
+
+    mailbox_configs = load_mailbox_configs(args.days)
+    logging.info("Loaded %s mailbox configuration(s).", len(mailbox_configs))
+
+    for index, mailbox_config in enumerate(mailbox_configs, start=1):
+        logging.info("Processing mailbox %s/%s.", index, len(mailbox_configs))
+        if not validate_mailbox_config(mailbox_config):
+            continue
+        result = delete_old_emails(mailbox_config)
+        notify_cleanup_result(result)

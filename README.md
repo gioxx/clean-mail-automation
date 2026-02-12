@@ -7,6 +7,7 @@ A Docker container to automatically clean an IMAP email inbox by deleting all em
 ## Features
 
 - Connects to any IMAP email server with specified credentials
+- Supports one or multiple mailbox cleanups in the same container run
 - Deletes emails older than N days (default: 10, configurable by env var or CLI)
 - Optional Telegram notification after each cleanup run (success/failure, deleted count, duration)
 - Detailed logging with INFO and ERROR levels
@@ -137,6 +138,30 @@ Example:
 - `SCHEDULE_MIN=30`
 
 This runs the cleanup every Monday at 01:30.
+
+---
+
+## Multi-Mailbox Mode
+
+Set `MAILBOX_CONFIGS` as a JSON array to process multiple mailboxes in a single run.  
+Each object can include:
+
+- `imap_server`
+- `imap_port` (optional, default `993`)
+- `email_user`
+- `email_pass`
+- `email_address` (optional, defaults to `email_user`)
+- `mailbox` (optional, default `INBOX`)
+- `clean_days` (optional, default from `CLEAN_DAYS` or `10`)
+
+Example:
+
+```bash
+-e MAILBOX_CONFIGS='[
+  {"imap_server":"imap.server.com","email_user":"user1","email_pass":"pass1","email_address":"mail1@example.com","mailbox":"INBOX","clean_days":10},
+  {"imap_server":"imap.server.com","email_user":"user2","email_pass":"pass2","email_address":"mail2@example.com","mailbox":"Archive","clean_days":30}
+]'
+```
 
 ---
 
