@@ -13,6 +13,7 @@ IMAP_SERVER = os.getenv('IMAP_SERVER')
 IMAP_PORT = int(os.getenv('IMAP_PORT', 993))
 EMAIL_USER = os.getenv('EMAIL_USER')
 EMAIL_PASS = os.getenv('EMAIL_PASS')
+EMAIL_ADDRESS = os.getenv('EMAIL_ADDRESS') or EMAIL_USER
 MAILBOX = 'INBOX'
 
 def delete_old_emails(days=10):
@@ -22,7 +23,7 @@ def delete_old_emails(days=10):
     error_message = None
     mail = None
 
-    logging.info(f"Start cleaning emails older than {days} days.")
+    logging.info("Start cleaning mailbox %s (user: %s), emails older than %s days.", EMAIL_ADDRESS, EMAIL_USER, days)
     cutoff_date = (datetime.date.today() - datetime.timedelta(days=days)).strftime("%d-%b-%Y")
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
@@ -119,11 +120,11 @@ def send_telegram_message(message):
 
 
 def notify_cleanup_result(result):
-    mailbox_user = EMAIL_USER or "unknown"
+    mailbox_address = EMAIL_ADDRESS or "unknown"
     if result["status"] == "success":
         message = (
             "Email cleanup completed.\n"
-            f"Mailbox: {mailbox_user}\n"
+            f"Mailbox: {mailbox_address}\n"
             f"Retention: {result['days']} days\n"
             f"Deleted emails: {result['deleted_count']}\n"
             f"Duration: {result['duration_seconds']:.2f}s"
@@ -131,14 +132,14 @@ def notify_cleanup_result(result):
     else:
         message = (
             "Email cleanup failed.\n"
-            f"Mailbox: {mailbox_user}\n"
+            f"Mailbox: {mailbox_address}\n"
             f"Retention: {result['days']} days\n"
             f"Duration: {result['duration_seconds']:.2f}s\n"
             f"Error: {result['error_message'] or 'Unknown error'}"
         )
     sent = send_telegram_message(message)
     if sent:
-        logging.info("Post-cleanup Telegram notification delivered for mailbox %s.", mailbox_user)
+        logging.info("Post-cleanup Telegram notification delivered for mailbox %s.", mailbox_address)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Delete IMAP emails older than N days.")

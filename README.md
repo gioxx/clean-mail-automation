@@ -44,6 +44,7 @@ docker run -d
 -e IMAP_PORT=993
 -e EMAIL_USER="your_username"
 -e EMAIL_PASS="your_password"
+-e EMAIL_ADDRESS="mailbox@example.com"
 -e CLEAN_DAYS=10
 -e TELEGRAM_BOT_TOKEN="123456:ABCDEF"
 -e TELEGRAM_CHAT_ID="123456789"
@@ -71,6 +72,7 @@ The combination above means the cleanup runs every Monday at 01:30 AM.
 - `IMAP_PORT`: IMAP port, defaults to `993` for SSL
 - `EMAIL_USER`: Username for the mailbox to clean (required)
 - `EMAIL_PASS`: Password for the mailbox to clean (required)
+- `EMAIL_ADDRESS`: Optional mailbox address shown in logs/notifications. Defaults to `EMAIL_USER`
 - `CLEAN_DAYS`: Optional number of days to keep emails before deletion (default: `10`)
 - `TELEGRAM_BOT_TOKEN`: Optional bot token used to send post-cleanup notifications
 - `TELEGRAM_CHAT_ID`: Optional target chat id for Telegram notifications
