@@ -92,6 +92,7 @@ def send_telegram_message(message):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
+        logging.info("Telegram notification skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not configured.")
         return False
 
     try:
@@ -113,14 +114,16 @@ def send_telegram_message(message):
         logging.error("Telegram notification failed: %s", error)
         return False
 
-    logging.info("Telegram notification sent.")
+    logging.info("Telegram notification sent to chat %s.", chat_id)
     return True
 
 
 def notify_cleanup_result(result):
+    mailbox_user = EMAIL_USER or "unknown"
     if result["status"] == "success":
         message = (
             "Email cleanup completed.\n"
+            f"Mailbox: {mailbox_user}\n"
             f"Retention: {result['days']} days\n"
             f"Deleted emails: {result['deleted_count']}\n"
             f"Duration: {result['duration_seconds']:.2f}s"
@@ -128,11 +131,14 @@ def notify_cleanup_result(result):
     else:
         message = (
             "Email cleanup failed.\n"
+            f"Mailbox: {mailbox_user}\n"
             f"Retention: {result['days']} days\n"
             f"Duration: {result['duration_seconds']:.2f}s\n"
             f"Error: {result['error_message'] or 'Unknown error'}"
         )
-    send_telegram_message(message)
+    sent = send_telegram_message(message)
+    if sent:
+        logging.info("Post-cleanup Telegram notification delivered for mailbox %s.", mailbox_user)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Delete IMAP emails older than N days.")
