@@ -1,13 +1,13 @@
 # Email Cleaner Docker Container
 
-A Docker container to automatically clean an IMAP email inbox by deleting all emails older than 10 days. The cleanup runs periodically according to a configurable schedule via environment variables.
+A Docker container to automatically clean an IMAP email inbox by deleting all emails older than a configurable number of days (default: 10). The cleanup runs periodically according to environment variables.
 
 ---
 
 ## Features
 
 - Connects to any IMAP email server with specified credentials
-- Deletes emails older than 10 days (customizable in the script)
+- Deletes emails older than N days (default: 10, configurable by env var or CLI)
 - Detailed logging with INFO and ERROR levels
 - Executes cleanup immediately on the first container start
 - Weekly repeated scheduling using cron inside the container
@@ -43,6 +43,7 @@ docker run -d
 -e IMAP_PORT=993
 -e EMAIL_USER="your_username"
 -e EMAIL_PASS="your_password"
+-e CLEAN_DAYS=10
 -e SCHEDULE_DAY=1
 -e SCHEDULE_HOUR=1
 -e SCHEDULE_MIN=30
@@ -67,6 +68,15 @@ The combination above means the cleanup runs every Monday at 01:30 AM.
 - `IMAP_PORT`: IMAP port, defaults to `993` for SSL
 - `EMAIL_USER`: Username for the mailbox to clean (required)
 - `EMAIL_PASS`: Password for the mailbox to clean (required)
+- `CLEAN_DAYS`: Optional number of days to keep emails before deletion (default: `10`)
+
+---
+
+## Cleaning Interval Overrides
+
+- Environment variable: set `CLEAN_DAYS` to configure retention in Docker/Compose.
+- Command line: run `python3 clean_email.py --days 30` to override at launch time.
+- If both are set, `--days` takes precedence over `CLEAN_DAYS`.
 
 ---
 
@@ -92,7 +102,7 @@ Or monitored live via Portainer's container logs UI.
 
 ## Customization
 
-- Modify `clean_email.py` to change the number of days for deletion (default is 10)
+- Set `CLEAN_DAYS` (or pass `--days`) to change the number of days for deletion
 - Adjust scheduling by setting different `SCHEDULE_DAY`, `SCHEDULE_HOUR`, and `SCHEDULE_MIN` values
 - Extend logging or add notification mechanisms as needed
 
