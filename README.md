@@ -46,7 +46,9 @@ docker run -d
 -e EMAIL_PASS="your_password"
 -e EMAIL_ADDRESS="mailbox@example.com"
 -e CLEAN_DAYS=10
+-e SEND_TELEGRAM_NOTIFICATIONS=true
 -e TELEGRAM_BOT_TOKEN="123456:ABCDEF"
+-e CLEAN_EMAIL_TELEGRAM_CHAT_ID="987654321"
 -e TELEGRAM_CHAT_ID="123456789"
 -e SCHEDULE_DAY=1
 -e SCHEDULE_HOUR=1
@@ -74,8 +76,10 @@ The combination above means the cleanup runs every Monday at 01:30 AM.
 - `EMAIL_PASS`: Password for the mailbox to clean (required)
 - `EMAIL_ADDRESS`: Optional mailbox address shown in logs/notifications. Defaults to `EMAIL_USER`
 - `CLEAN_DAYS`: Optional number of days to keep emails before deletion (default: `10`)
+- `SEND_TELEGRAM_NOTIFICATIONS`: Optional flag to enable Telegram notifications (default: `false`). Accepted true values: `1`, `true`, `yes`, `on`
 - `TELEGRAM_BOT_TOKEN`: Optional bot token used to send post-cleanup notifications
-- `TELEGRAM_CHAT_ID`: Optional target chat id for Telegram notifications
+- `CLEAN_EMAIL_TELEGRAM_CHAT_ID`: Optional chat id dedicated to this app. If set, it has priority over `TELEGRAM_CHAT_ID`
+- `TELEGRAM_CHAT_ID`: Optional fallback chat id for Telegram notifications
 - `TELEGRAM_TIMEOUT`: Optional timeout in seconds for Telegram API calls (default: `10`)
 
 ---
@@ -90,7 +94,9 @@ The combination above means the cleanup runs every Monday at 01:30 AM.
 
 ## Telegram Notifications
 
-- If both `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are set, the script sends a message after each run.
+- Notifications are disabled by default. Set `SEND_TELEGRAM_NOTIFICATIONS=true` to enable them.
+- When enabled, the script requires `TELEGRAM_BOT_TOKEN` plus a chat id.
+- Chat id precedence: `CLEAN_EMAIL_TELEGRAM_CHAT_ID` first, then `TELEGRAM_CHAT_ID` as fallback.
 - Success notifications include: retention days, deleted email count, and total duration.
 - Failure notifications include: retention days, duration, and error details.
 

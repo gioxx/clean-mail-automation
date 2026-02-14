@@ -15,6 +15,9 @@ EMAIL_USER = os.getenv('EMAIL_USER')
 EMAIL_PASS = os.getenv('EMAIL_PASS')
 EMAIL_ADDRESS = os.getenv('EMAIL_ADDRESS') or EMAIL_USER
 MAILBOX = 'INBOX'
+SEND_TELEGRAM_NOTIFICATIONS = os.getenv("SEND_TELEGRAM_NOTIFICATIONS", "false").strip().lower() in {
+    "1", "true", "yes", "on"
+}
 
 def delete_old_emails(days=10):
     start_time = time.monotonic()
@@ -91,9 +94,12 @@ def resolve_clean_days(cli_days=None):
 
 def send_telegram_message(message):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    chat_id = os.getenv("CLEAN_EMAIL_TELEGRAM_CHAT_ID") or os.getenv("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
-        logging.info("Telegram notification skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not configured.")
+        logging.info(
+            "Telegram notification skipped: TELEGRAM_BOT_TOKEN and chat id are required "
+            "(CLEAN_EMAIL_TELEGRAM_CHAT_ID has priority over TELEGRAM_CHAT_ID)."
+        )
         return False
 
     try:
@@ -120,6 +126,12 @@ def send_telegram_message(message):
 
 
 def notify_cleanup_result(result):
+    if not SEND_TELEGRAM_NOTIFICATIONS:
+        logging.info(
+            "Telegram notification skipped: SEND_TELEGRAM_NOTIFICATIONS is disabled (default: false)."
+        )
+        return
+
     mailbox_address = EMAIL_ADDRESS or "unknown"
     if result["status"] == "success":
         message = (
