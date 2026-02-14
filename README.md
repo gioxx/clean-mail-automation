@@ -58,37 +58,52 @@ docker run -d
 
 ---
 
-## Scheduling Environment Variables
+## All Parameters
 
-- `SCHEDULE_DAY`: Day of the week for the cron job (0 or 7 = Sunday, 1 = Monday, ..., 6 = Saturday)
-- `SCHEDULE_HOUR`: Hour of the day in 24h format (0-23)
-- `SCHEDULE_MIN`: Minute of the hour (0-59)
+### Environment Variables (Container + Script)
 
-The combination above means the cleanup runs every Monday at 01:30 AM.
+| Name | Used by | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `IMAP_SERVER` | script | Yes | none | IMAP server hostname or IP. |
+| `IMAP_PORT` | script | No | `993` | IMAP SSL port. |
+| `EMAIL_USER` | script | Yes | none | Username for IMAP login. |
+| `EMAIL_PASS` | script | Yes | none | Password for IMAP login. |
+| `EMAIL_ADDRESS` | script | No | `EMAIL_USER` | Mailbox label shown in logs/notifications. |
+| `CLEAN_DAYS` | script | No | `10` | Deletes messages older than this many days. Ignored if `--days` is passed. |
+| `SEND_TELEGRAM_NOTIFICATIONS` | script | No | `false` | Enables Telegram notifications. True values: `1`, `true`, `yes`, `on` (case-insensitive). |
+| `TELEGRAM_BOT_TOKEN` | script | Cond. | none | Required only when Telegram notifications are enabled. |
+| `CLEAN_EMAIL_TELEGRAM_CHAT_ID` | script | Cond. | none | Dedicated chat id for this app. Takes priority over `TELEGRAM_CHAT_ID`. |
+| `TELEGRAM_CHAT_ID` | script | Cond. | none | Fallback chat id if `CLEAN_EMAIL_TELEGRAM_CHAT_ID` is not set. |
+| `TELEGRAM_TIMEOUT` | script | No | `10` | Timeout in seconds for Telegram API calls. |
+| `SCHEDULE_MIN` | container entrypoint | No | `0` | Cron minute (`0-59`). |
+| `SCHEDULE_HOUR` | container entrypoint | No | `0` | Cron hour (`0-23`). |
+| `SCHEDULE_DAY` | container entrypoint | No | `0` | Cron weekday (`0-7`, where `0`/`7` = Sunday). |
+
+`SCHEDULE_DAY=1`, `SCHEDULE_HOUR=1`, `SCHEDULE_MIN=30` means: every Monday at 01:30.
 
 ---
 
-## IMAP Environment Variables
+### CLI Arguments (`clean_email.py`)
 
-- `IMAP_SERVER`: IMAP server hostname or IP (required)
-- `IMAP_PORT`: IMAP port, defaults to `993` for SSL
-- `EMAIL_USER`: Username for the mailbox to clean (required)
-- `EMAIL_PASS`: Password for the mailbox to clean (required)
-- `EMAIL_ADDRESS`: Optional mailbox address shown in logs/notifications. Defaults to `EMAIL_USER`
-- `CLEAN_DAYS`: Optional number of days to keep emails before deletion (default: `10`)
-- `SEND_TELEGRAM_NOTIFICATIONS`: Optional flag to enable Telegram notifications (default: `false`). Accepted true values: `1`, `true`, `yes`, `on`
-- `TELEGRAM_BOT_TOKEN`: Optional bot token used to send post-cleanup notifications
-- `CLEAN_EMAIL_TELEGRAM_CHAT_ID`: Optional chat id dedicated to this app. If set, it has priority over `TELEGRAM_CHAT_ID`
-- `TELEGRAM_CHAT_ID`: Optional fallback chat id for Telegram notifications
-- `TELEGRAM_TIMEOUT`: Optional timeout in seconds for Telegram API calls (default: `10`)
+| Argument | Required | Default | Description |
+| --- | --- | --- | --- |
+| `--days <int>` | No | `CLEAN_DAYS` or `10` | Override retention days for that run. If set, it has priority over `CLEAN_DAYS`. |
 
----
+### Scheduling Environment Variables
 
-## Cleaning Interval Overrides
+Use these three variables together to define the cron schedule used by the container:
 
-- Environment variable: set `CLEAN_DAYS` to configure retention in Docker/Compose.
-- Command line: run `python3 clean_email.py --days 30` to override at launch time.
-- If both are set, `--days` takes precedence over `CLEAN_DAYS`.
+- `SCHEDULE_DAY`: Day of the week for the cron job (`0` or `7` = Sunday, `1` = Monday, ..., `6` = Saturday)
+- `SCHEDULE_HOUR`: Hour of the day in 24h format (`0-23`)
+- `SCHEDULE_MIN`: Minute of the hour (`0-59`)
+
+Example:
+
+- `SCHEDULE_DAY=1`
+- `SCHEDULE_HOUR=1`
+- `SCHEDULE_MIN=30`
+
+This runs the cleanup every Monday at 01:30.
 
 ---
 
