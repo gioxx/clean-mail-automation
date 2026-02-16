@@ -26,7 +26,42 @@ A Docker container to automatically clean an IMAP email inbox by deleting all em
 
 ## Getting Started
 
-### Build the Docker Image
+## Official Prebuilt Images
+
+You can run this project without building locally by using one of the official prebuilt images:
+
+- GHCR: `ghcr.io/gioxx/clean-mail-automation:latest`
+- Docker Hub: `gfsolone/clean-mail-automation:latest`
+
+### Option A: Run Official Prebuilt Image (Recommended)
+
+This example runs cleanup every Monday at 1:30 AM:
+
+```bash
+docker run -d \
+-e IMAP_SERVER="imap.server.com" \
+-e IMAP_PORT=993 \
+-e EMAIL_USER="your_username" \
+-e EMAIL_PASS="your_password" \
+-e EMAIL_ADDRESS="mailbox@example.com" \
+-e CLEAN_DAYS=10 \
+-e SEND_TELEGRAM_NOTIFICATIONS=true \
+-e TELEGRAM_BOT_TOKEN="123456:ABCDEF" \
+-e CLEAN_EMAIL_TELEGRAM_CHAT_ID="987654321" \
+-e TELEGRAM_CHAT_ID="123456789" \
+-e SCHEDULE_DAY=1 \
+-e SCHEDULE_HOUR=1 \
+-e SCHEDULE_MIN=30 \
+--name email_cleaner ghcr.io/gioxx/clean-mail-automation:latest
+```
+
+If you prefer Docker Hub:
+
+```bash
+docker run -d --name email_cleaner gfsolone/clean-mail-automation:latest
+```
+
+### Option B: Build the Docker Image Locally
 
 Clone this repository and build the image with:
 
@@ -34,25 +69,23 @@ Clone this repository and build the image with:
 docker build -t email-cleaner .
 ```
 
-### Run the Container
-
-Run the container passing environment variables for server, credentials, and schedule configuration. This example runs cleanup every Monday at 1:30 AM:
+Then run the local image:
 
 ```bash
-docker run -d
--e IMAP_SERVER="imap.server.com"
--e IMAP_PORT=993
--e EMAIL_USER="your_username"
--e EMAIL_PASS="your_password"
--e EMAIL_ADDRESS="mailbox@example.com"
--e CLEAN_DAYS=10
--e SEND_TELEGRAM_NOTIFICATIONS=true
--e TELEGRAM_BOT_TOKEN="123456:ABCDEF"
--e CLEAN_EMAIL_TELEGRAM_CHAT_ID="987654321"
--e TELEGRAM_CHAT_ID="123456789"
--e SCHEDULE_DAY=1
--e SCHEDULE_HOUR=1
--e SCHEDULE_MIN=30
+docker run -d \
+-e IMAP_SERVER="imap.server.com" \
+-e IMAP_PORT=993 \
+-e EMAIL_USER="your_username" \
+-e EMAIL_PASS="your_password" \
+-e EMAIL_ADDRESS="mailbox@example.com" \
+-e CLEAN_DAYS=10 \
+-e SEND_TELEGRAM_NOTIFICATIONS=true \
+-e TELEGRAM_BOT_TOKEN="123456:ABCDEF" \
+-e CLEAN_EMAIL_TELEGRAM_CHAT_ID="987654321" \
+-e TELEGRAM_CHAT_ID="123456789" \
+-e SCHEDULE_DAY=1 \
+-e SCHEDULE_HOUR=1 \
+-e SCHEDULE_MIN=30 \
 --name email_cleaner email-cleaner
 ```
 
@@ -154,3 +187,4 @@ Contributions, issues, and feature requests are welcome! Feel free to fork the r
 ## License
 
 This project is licensed under the MIT License.
+
