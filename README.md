@@ -10,9 +10,10 @@ A Docker container to automatically clean an IMAP email inbox by deleting all em
 - Supports one or multiple mailbox cleanups in the same container run
 - Deletes emails older than N days (default: 10, configurable by env var or CLI)
 - Optional Telegram notification after each cleanup run (success/failure, deleted count, duration)
+- Optional web status page showing configuration and last-run results
 - Detailed logging with INFO and ERROR levels
 - Executes cleanup immediately on the first container start
-- Weekly repeated scheduling using cron inside the container
+- Periodic scheduling using cron inside the container
 - Logs available on container stdout, easy to monitor via Portainer or Docker CLI
 
 ---
@@ -103,7 +104,9 @@ docker run -d \
 | `EMAIL_USER` | script | Yes | none | Username for IMAP login. |
 | `EMAIL_PASS` | script | Yes | none | Password for IMAP login. |
 | `EMAIL_ADDRESS` | script | No | `EMAIL_USER` | Mailbox label shown in logs/notifications. |
+| `MAILBOX` | script | No | `INBOX` | IMAP folder to clean. |
 | `CLEAN_DAYS` | script | No | `10` | Deletes messages older than this many days. Ignored if `--days` is passed. |
+| `MAILBOX_CONFIGS` | script | No | none | JSON array for multi-mailbox mode. If set, single-mailbox env vars become fallback/defaults. |
 | `SEND_TELEGRAM_NOTIFICATIONS` | script | No | `false` | Enables Telegram notifications. True values: `1`, `true`, `yes`, `on` (case-insensitive). |
 | `TELEGRAM_BOT_TOKEN` | script | Cond. | none | Required only when Telegram notifications are enabled. |
 | `CLEAN_EMAIL_TELEGRAM_CHAT_ID` | script | Cond. | none | Dedicated chat id for this app. Takes priority over `TELEGRAM_CHAT_ID`. |
@@ -111,7 +114,8 @@ docker run -d \
 | `TELEGRAM_TIMEOUT` | script | No | `10` | Timeout in seconds for Telegram API calls. |
 | `SCHEDULE_MIN` | container entrypoint | No | `0` | Cron minute (`0-59`). |
 | `SCHEDULE_HOUR` | container entrypoint | No | `0` | Cron hour (`0-23`). |
-| `SCHEDULE_DAY` | container entrypoint | No | `0` | Cron weekday (`0-7`, where `0`/`7` = Sunday). |
+| `SCHEDULE_DAY` | container entrypoint | No | `0` | Cron weekday (`0-7`, where `0`/`7` = Sunday). Use `*` to run every day. |
+| `WEB_PORT` | container entrypoint | No | none | When set, starts an HTTP status page on this port. |
 
 `SCHEDULE_DAY=1`, `SCHEDULE_HOUR=1`, `SCHEDULE_MIN=30` means: every Monday at 01:30.
 
@@ -127,7 +131,7 @@ docker run -d \
 
 Use these three variables together to define the cron schedule used by the container:
 
-- `SCHEDULE_DAY`: Day of the week for the cron job (`0` or `7` = Sunday, `1` = Monday, ..., `6` = Saturday)
+- `SCHEDULE_DAY`: Day of the week for the cron job (`0` or `7` = Sunday, `1` = Monday, ..., `6` = Saturday). Use `*` to run every day.
 - `SCHEDULE_HOUR`: Hour of the day in 24h format (`0-23`)
 - `SCHEDULE_MIN`: Minute of the hour (`0-59`)
 
@@ -165,19 +169,55 @@ Example:
 
 ---
 
+## Web Status Page
+
+An optional web status page can be enabled by setting the `WEB_PORT` environment variable. When enabled, the container serves a read-only dashboard at `http://<host>:<port>/` showing:
+
+- Configured mailboxes (IMAP server, folder, retention — passwords never exposed)
+- Schedule (cron expression and human-readable description)
+- Telegram notification status
+- Results of the last cleanup run (per-mailbox status, deleted count, duration, errors)
+
+The page auto-refreshes every 60 seconds.
+
+**Without `WEB_PORT` the container behaves exactly as before — no web server is started.**
+
+### docker-compose example
+
+```yaml
+services:
+  email-cleaner:
+    image: ghcr.io/gioxx/clean-mail-automation:latest
+    environment:
+      - IMAP_SERVER=imap.server.com
+      - EMAIL_USER=your_username
+      - EMAIL_PASS=your_password
+      - CLEAN_DAYS=10
+      - SCHEDULE_DAY=1
+      - SCHEDULE_HOUR=1
+      - SCHEDULE_MIN=30
+      - WEB_PORT=8080
+    ports:
+      - "8080:8080"
+```
+
+---
+
 ## Telegram Notifications
 
 - Notifications are disabled by default. Set `SEND_TELEGRAM_NOTIFICATIONS=true` to enable them.
 - When enabled, the script requires `TELEGRAM_BOT_TOKEN` plus a chat id.
 - Chat id precedence: `CLEAN_EMAIL_TELEGRAM_CHAT_ID` first, then `TELEGRAM_CHAT_ID` as fallback.
-- Success notifications include: retention days, deleted email count, and total duration.
-- Failure notifications include: retention days, duration, and error details.
+- Success notifications include: mailbox address, folder, retention days, deleted email count, and total duration.
+- Failure notifications include: mailbox address, folder, retention days, duration, and error details.
+- In multi-mailbox mode, one notification is sent per mailbox after each individual cleanup.
 
 ---
 
 ## Project Structure
 
 - `clean_email.py`: Python script that connects via IMAP and deletes old emails, with logging
+- `status_server.py`: Optional HTTP server that serves the web status page (started only when `WEB_PORT` is set)
 - `entrypoint.sh`: Bash script that sets up the cron job and starts the cron daemon
 - `Dockerfile`: Docker image definition file
 
@@ -199,7 +239,7 @@ Or monitored live via Portainer's container logs UI.
 
 - Set `CLEAN_DAYS` (or pass `--days`) to change the number of days for deletion
 - Adjust scheduling by setting different `SCHEDULE_DAY`, `SCHEDULE_HOUR`, and `SCHEDULE_MIN` values
-- Extend logging or add notification mechanisms as needed
+- Use `MAILBOX_CONFIGS` to clean multiple mailboxes in a single container run
 
 ---
 
@@ -212,4 +252,3 @@ Contributions, issues, and feature requests are welcome! Feel free to fork the r
 ## License
 
 This project is licensed under the MIT License.
-

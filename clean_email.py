@@ -11,6 +11,7 @@ import urllib.request
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 DEFAULT_MAILBOX = "INBOX"
+STATE_FILE = "/tmp/clean_mail_last_run.json"
 
 SEND_TELEGRAM_NOTIFICATIONS = os.getenv("SEND_TELEGRAM_NOTIFICATIONS", "false").strip().lower() in {
     "1", "true", "yes", "on"
@@ -262,6 +263,29 @@ def notify_cleanup_result(result):
         logging.info("Post-cleanup Telegram notification delivered for mailbox %s.", mailbox_address)
 
 
+def save_run_state(results):
+    state = {
+        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "results": [
+            {
+                "mailbox_address": r.get("mailbox_address", ""),
+                "mailbox_name": r.get("mailbox_name", DEFAULT_MAILBOX),
+                "status": r.get("status", "unknown"),
+                "deleted_count": r.get("deleted_count", 0),
+                "days": r.get("days", 0),
+                "duration_seconds": round(r.get("duration_seconds", 0), 3),
+                "error_message": r.get("error_message"),
+            }
+            for r in results
+        ],
+    }
+    try:
+        with open(STATE_FILE, "w") as f:
+            json.dump(state, f)
+    except OSError as error:
+        logging.warning("Could not write run state to %s: %s", STATE_FILE, error)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Delete IMAP emails older than N days.")
     parser.add_argument(
@@ -275,9 +299,13 @@ if __name__ == "__main__":
     mailbox_configs = load_mailbox_configs(args.days)
     logging.info("Loaded %s mailbox configuration(s).", len(mailbox_configs))
 
+    results = []
     for index, mailbox_config in enumerate(mailbox_configs, start=1):
         logging.info("Processing mailbox %s/%s.", index, len(mailbox_configs))
         if not validate_mailbox_config(mailbox_config):
             continue
         result = delete_old_emails(mailbox_config)
         notify_cleanup_result(result)
+        results.append(result)
+
+    save_run_state(results)
