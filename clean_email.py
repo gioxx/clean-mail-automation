@@ -1,9 +1,11 @@
 import argparse
+import collections
 import datetime
 import imaplib
 import json
 import logging
 import os
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -16,6 +18,15 @@ STATE_FILE = "/tmp/clean_mail_last_run.json"
 SEND_TELEGRAM_NOTIFICATIONS = os.getenv("SEND_TELEGRAM_NOTIFICATIONS", "false").strip().lower() in {
     "1", "true", "yes", "on"
 }
+# "always" = notify after every run (default)
+# "digest" = accumulate results and send on a separate schedule (--send-digest)
+NOTIFY_MODE = os.getenv("TELEGRAM_NOTIFY_MODE", "always").strip().lower()
+# When true, skip notifications for runs where nothing was deleted
+NOTIFY_ONLY_IF_DELETED = os.getenv("TELEGRAM_NOTIFY_ONLY_IF_DELETED", "false").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+
+DIGEST_FILE = "/tmp/clean_mail_digest.json"
 
 
 def parse_non_negative_int(value, default_value, context_name):
@@ -236,6 +247,20 @@ def notify_cleanup_result(result):
         )
         return
 
+    if NOTIFY_ONLY_IF_DELETED and result.get("deleted_count", 0) == 0:
+        logging.info(
+            "Telegram notification skipped: no emails deleted and TELEGRAM_NOTIFY_ONLY_IF_DELETED is enabled."
+        )
+        return
+
+    if NOTIFY_MODE == "digest":
+        _accumulate_for_digest(result)
+        return
+
+    _send_run_notification(result)
+
+
+def _send_run_notification(result):
     mailbox_address = result["mailbox_address"] or "unknown"
     mailbox_name = result["mailbox_name"] or DEFAULT_MAILBOX
 
@@ -261,6 +286,92 @@ def notify_cleanup_result(result):
     sent = send_telegram_message(message)
     if sent:
         logging.info("Post-cleanup Telegram notification delivered for mailbox %s.", mailbox_address)
+
+
+def _accumulate_for_digest(result):
+    try:
+        with open(DIGEST_FILE) as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = {"runs": []}
+
+    data["runs"].append({
+        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "mailbox_address": result.get("mailbox_address", ""),
+        "mailbox_name": result.get("mailbox_name", DEFAULT_MAILBOX),
+        "status": result.get("status", "unknown"),
+        "deleted_count": result.get("deleted_count", 0),
+        "days": result.get("days", 0),
+        "duration_seconds": round(result.get("duration_seconds", 0), 3),
+        "error_message": result.get("error_message"),
+    })
+
+    try:
+        with open(DIGEST_FILE, "w") as f:
+            json.dump(data, f)
+        logging.info(
+            "Result accumulated for digest (mailbox %s, total accumulated: %s).",
+            result.get("mailbox_address", "unknown"),
+            len(data["runs"]),
+        )
+    except OSError as error:
+        logging.warning("Could not write digest file %s: %s", DIGEST_FILE, error)
+
+
+def send_and_clear_digest():
+    try:
+        with open(DIGEST_FILE) as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        logging.info("Digest: no accumulated data found, nothing to send.")
+        return
+    except json.JSONDecodeError as error:
+        logging.error("Digest: could not read digest file: %s", error)
+        return
+
+    runs = data.get("runs", [])
+    if not runs:
+        logging.info("Digest: no runs accumulated, nothing to send.")
+        return
+
+    # Aggregate per mailbox
+    mailboxes = collections.OrderedDict()
+    for run in runs:
+        key = f"{run['mailbox_address']} ({run['mailbox_name']})"
+        if key not in mailboxes:
+            mailboxes[key] = {"total": 0, "deleted": 0, "errors": 0}
+        mailboxes[key]["total"] += 1
+        mailboxes[key]["deleted"] += run.get("deleted_count", 0)
+        if run.get("status") != "success":
+            mailboxes[key]["errors"] += 1
+
+    period_start = runs[0]["timestamp"]
+    period_end = runs[-1]["timestamp"]
+    total_deleted = sum(r.get("deleted_count", 0) for r in runs)
+
+    lines = [
+        "Email Cleanup Digest",
+        f"Period: {period_start} \u2013 {period_end}",
+        f"Total runs: {len(runs)} | Total deleted: {total_deleted}",
+        "",
+    ]
+    for key, mb in mailboxes.items():
+        icon = "\u274c" if mb["errors"] else "\u2705"
+        err_note = f" | Errors: {mb['errors']}" if mb["errors"] else ""
+        lines.append(f"{icon} {key}")
+        lines.append(f"   Runs: {mb['total']} | Deleted: {mb['deleted']}{err_note}")
+
+    sent = send_telegram_message("\n".join(lines))
+    if sent:
+        logging.info(
+            "Digest sent successfully (%s runs, %s mailboxes).", len(runs), len(mailboxes)
+        )
+        try:
+            os.remove(DIGEST_FILE)
+        except OSError:
+            pass
+    else:
+        logging.error("Digest send failed; accumulated data preserved for next attempt.")
 
 
 def save_run_state(results):
@@ -294,7 +405,16 @@ if __name__ == "__main__":
         default=None,
         help="Delete emails older than this number of days (default: 10, or CLEAN_DAYS env var).",
     )
+    parser.add_argument(
+        "--send-digest",
+        action="store_true",
+        help="Send the accumulated digest notification and clear the digest file, then exit.",
+    )
     args = parser.parse_args()
+
+    if args.send_digest:
+        send_and_clear_digest()
+        sys.exit(0)
 
     mailbox_configs = load_mailbox_configs(args.days)
     logging.info("Loaded %s mailbox configuration(s).", len(mailbox_configs))

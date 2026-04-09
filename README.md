@@ -10,7 +10,7 @@ A Docker container to automatically clean an IMAP email inbox by deleting all em
 - Supports one or multiple mailbox cleanups in the same container run
 - Deletes emails older than N days (default: 10, configurable by env var or CLI)
 - Optional Telegram notification after each cleanup run (success/failure, deleted count, duration)
-- Optional web status page showing configuration and last-run results
+- Web status page always available inside the container, showing configuration and last-run results
 - Detailed logging with INFO and ERROR levels
 - Executes cleanup immediately on the first container start
 - Periodic scheduling using cron inside the container
@@ -28,7 +28,7 @@ A Docker container to automatically clean an IMAP email inbox by deleting all em
 
 ## Getting Started
 
-## Official Prebuilt Images
+### Official Prebuilt Images
 
 You can run this project without building locally by using one of the official prebuilt images:
 
@@ -41,26 +41,26 @@ This example runs cleanup every Monday at 1:30 AM:
 
 ```bash
 docker run -d \
--e IMAP_SERVER="imap.server.com" \
--e IMAP_PORT=993 \
--e EMAIL_USER="your_username" \
--e EMAIL_PASS="your_password" \
--e EMAIL_ADDRESS="mailbox@example.com" \
--e CLEAN_DAYS=10 \
--e SEND_TELEGRAM_NOTIFICATIONS=true \
--e TELEGRAM_BOT_TOKEN="123456:ABCDEF" \
--e CLEAN_EMAIL_TELEGRAM_CHAT_ID="987654321" \
--e TELEGRAM_CHAT_ID="123456789" \
--e SCHEDULE_DAY=1 \
--e SCHEDULE_HOUR=1 \
--e SCHEDULE_MIN=30 \
---name email_cleaner ghcr.io/gioxx/clean-mail-automation:latest
+  -e IMAP_SERVER="imap.server.com" \
+  -e IMAP_PORT=993 \
+  -e EMAIL_USER="your_username" \
+  -e EMAIL_PASS="your_password" \
+  -e EMAIL_ADDRESS="mailbox@example.com" \
+  -e CLEAN_DAYS=10 \
+  -e SEND_TELEGRAM_NOTIFICATIONS=true \
+  -e TELEGRAM_BOT_TOKEN="123456:ABCDEF" \
+  -e TELEGRAM_CHAT_ID="987654321" \
+  -e SCHEDULE_DAY=1 \
+  -e SCHEDULE_HOUR=1 \
+  -e SCHEDULE_MIN=30 \
+  -p 8080:8080 \
+  --name email_cleaner ghcr.io/gioxx/clean-mail-automation:latest
 ```
 
 If you prefer Docker Hub:
 
 ```bash
-docker run -d --name email_cleaner gfsolone/clean-mail-automation:latest
+docker run -d -p 8080:8080 --name email_cleaner gfsolone/clean-mail-automation:latest
 ```
 
 ### Option B: Build the Docker Image Locally
@@ -75,20 +75,20 @@ Then run the local image:
 
 ```bash
 docker run -d \
--e IMAP_SERVER="imap.server.com" \
--e IMAP_PORT=993 \
--e EMAIL_USER="your_username" \
--e EMAIL_PASS="your_password" \
--e EMAIL_ADDRESS="mailbox@example.com" \
--e CLEAN_DAYS=10 \
--e SEND_TELEGRAM_NOTIFICATIONS=true \
--e TELEGRAM_BOT_TOKEN="123456:ABCDEF" \
--e CLEAN_EMAIL_TELEGRAM_CHAT_ID="987654321" \
--e TELEGRAM_CHAT_ID="123456789" \
--e SCHEDULE_DAY=1 \
--e SCHEDULE_HOUR=1 \
--e SCHEDULE_MIN=30 \
---name email_cleaner email-cleaner
+  -e IMAP_SERVER="imap.server.com" \
+  -e IMAP_PORT=993 \
+  -e EMAIL_USER="your_username" \
+  -e EMAIL_PASS="your_password" \
+  -e EMAIL_ADDRESS="mailbox@example.com" \
+  -e CLEAN_DAYS=10 \
+  -e SEND_TELEGRAM_NOTIFICATIONS=true \
+  -e TELEGRAM_BOT_TOKEN="123456:ABCDEF" \
+  -e TELEGRAM_CHAT_ID="987654321" \
+  -e SCHEDULE_DAY=1 \
+  -e SCHEDULE_HOUR=1 \
+  -e SCHEDULE_MIN=30 \
+  -p 8080:8080 \
+  --name email_cleaner email-cleaner
 ```
 
 ---
@@ -112,10 +112,15 @@ docker run -d \
 | `CLEAN_EMAIL_TELEGRAM_CHAT_ID` | script | Cond. | none | Dedicated chat id for this app. Takes priority over `TELEGRAM_CHAT_ID`. |
 | `TELEGRAM_CHAT_ID` | script | Cond. | none | Fallback chat id if `CLEAN_EMAIL_TELEGRAM_CHAT_ID` is not set. |
 | `TELEGRAM_TIMEOUT` | script | No | `10` | Timeout in seconds for Telegram API calls. |
+| `TELEGRAM_NOTIFY_MODE` | script | No | `always` | `always`: notify after every run. `digest`: accumulate results and send on a separate schedule (see Digest). |
+| `TELEGRAM_NOTIFY_ONLY_IF_DELETED` | script | No | `false` | When `true`, skip notifications for runs where no emails were deleted. Works with both modes. |
 | `SCHEDULE_MIN` | container entrypoint | No | `0` | Cron minute (`0-59`). |
 | `SCHEDULE_HOUR` | container entrypoint | No | `0` | Cron hour (`0-23`). |
 | `SCHEDULE_DAY` | container entrypoint | No | `0` | Cron weekday (`0-7`, where `0`/`7` = Sunday). Use `*` to run every day. |
-| `WEB_PORT` | container entrypoint | No | none | When set, starts an HTTP status page on this port. |
+| `DIGEST_SCHEDULE_MIN` | container entrypoint | No | `0` | Digest send cron minute. Only used when `TELEGRAM_NOTIFY_MODE=digest`. |
+| `DIGEST_SCHEDULE_HOUR` | container entrypoint | No | `8` | Digest send cron hour. Only used when `TELEGRAM_NOTIFY_MODE=digest`. |
+| `DIGEST_SCHEDULE_DAY` | container entrypoint | No | `0` | Digest send cron weekday (same format as `SCHEDULE_DAY`). Only used when `TELEGRAM_NOTIFY_MODE=digest`. |
+| `WEB_PORT` | container entrypoint | No | `8080` | Port the web status page listens on inside the container. Always started; override only if port `8080` conflicts. |
 
 `SCHEDULE_DAY=1`, `SCHEDULE_HOUR=1`, `SCHEDULE_MIN=30` means: every Monday at 01:30.
 
@@ -126,6 +131,7 @@ docker run -d \
 | Argument | Required | Default | Description |
 | --- | --- | --- | --- |
 | `--days <int>` | No | `CLEAN_DAYS` or `10` | Override retention days for that run. If set, it has priority over `CLEAN_DAYS`. |
+| `--send-digest` | No | — | Send the accumulated digest notification and clear the digest file, then exit. Called automatically by the digest cron inside the container. |
 
 ### Scheduling Environment Variables
 
@@ -171,7 +177,7 @@ Example:
 
 ## Web Status Page
 
-An optional web status page can be enabled by setting the `WEB_PORT` environment variable. When enabled, the container serves a read-only dashboard at `http://<host>:<port>/` showing:
+The container always serves a read-only web status dashboard at `http://<host>:<port>/` (default port `8080`). The page shows:
 
 - Configured mailboxes (IMAP server, folder, retention — passwords never exposed)
 - Schedule (cron expression and human-readable description)
@@ -180,7 +186,7 @@ An optional web status page can be enabled by setting the `WEB_PORT` environment
 
 The page auto-refreshes every 60 seconds.
 
-**Without `WEB_PORT` the container behaves exactly as before — no web server is started.**
+The status page is only started by `entrypoint.sh` inside the Docker container. Running `clean_email.py` directly (outside Docker) does not start any web server.
 
 ### docker-compose example
 
@@ -196,9 +202,16 @@ services:
       - SCHEDULE_DAY=1
       - SCHEDULE_HOUR=1
       - SCHEDULE_MIN=30
-      - WEB_PORT=8080
     ports:
       - "8080:8080"
+    restart: unless-stopped
+```
+
+To expose the status page on a different host port (e.g. `3200`), adjust the `ports` mapping accordingly — no need to set `WEB_PORT` unless you also want to change the internal port:
+
+```yaml
+ports:
+  - "3200:8080"
 ```
 
 ---
@@ -207,19 +220,39 @@ services:
 
 - Notifications are disabled by default. Set `SEND_TELEGRAM_NOTIFICATIONS=true` to enable them.
 - When enabled, the script requires `TELEGRAM_BOT_TOKEN` plus a chat id.
-- Chat id precedence: `CLEAN_EMAIL_TELEGRAM_CHAT_ID` first, then `TELEGRAM_CHAT_ID` as fallback.
+- Chat id precedence: `CLEAN_EMAIL_TELEGRAM_CHAT_ID` first, then `TELEGRAM_CHAT_ID` as fallback. Use one of the two — there is no need to set both.
 - Success notifications include: mailbox address, folder, retention days, deleted email count, and total duration.
 - Failure notifications include: mailbox address, folder, retention days, duration, and error details.
 - In multi-mailbox mode, one notification is sent per mailbox after each individual cleanup.
+
+### Notification modes
+
+| `TELEGRAM_NOTIFY_MODE` | Behaviour |
+| --- | --- |
+| `always` (default) | A notification is sent immediately after each cleanup run. |
+| `digest` | Results are accumulated locally and sent together on a configurable schedule (see `DIGEST_SCHEDULE_*`). Useful when cleanup runs frequently but you want a single weekly summary. |
+
+Set `TELEGRAM_NOTIFY_ONLY_IF_DELETED=true` (works with either mode) to suppress notifications when no emails were deleted — eliminates noise on quiet mailboxes.
+
+**Digest example** — cleanup runs daily, digest every Sunday at 08:00:
+
+```yaml
+- TELEGRAM_NOTIFY_MODE=digest
+- DIGEST_SCHEDULE_DAY=0
+- DIGEST_SCHEDULE_HOUR=8
+- DIGEST_SCHEDULE_MIN=0
+```
 
 ---
 
 ## Project Structure
 
-- `clean_email.py`: Python script that connects via IMAP and deletes old emails, with logging
-- `status_server.py`: Optional HTTP server that serves the web status page (started only when `WEB_PORT` is set)
-- `entrypoint.sh`: Bash script that sets up the cron job and starts the cron daemon
-- `Dockerfile`: Docker image definition file
+```
+clean_email.py       Core script: connects via IMAP and deletes old emails, with logging
+status_server.py     HTTP server for the web status page (started by entrypoint.sh, not by the script directly)
+entrypoint.sh        Container entrypoint: sets up cron, starts the status server, then runs the first cleanup
+Dockerfile           Docker image definition
+```
 
 ---
 

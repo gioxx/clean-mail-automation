@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Optional HTTP status page for clean-mail-automation.
+"""HTTP status page for clean-mail-automation.
 
-Starts only when the WEB_PORT environment variable is set.
+Always started by entrypoint.sh inside the Docker container.
+Listens on WEB_PORT (default 8080). Not started by clean_email.py directly.
 Reads configuration from env vars and last-run state from STATE_FILE.
 """
 
@@ -82,20 +83,24 @@ def _get_schedule():
 
 
 def _telegram_status():
-    """Return (enabled: bool, detail: str)."""
+    """Return (enabled: bool, detail: str, mode: str, only_if_deleted: bool)."""
     gate = os.getenv("SEND_TELEGRAM_NOTIFICATIONS", "false").strip().lower() in {
         "1", "true", "yes", "on"
     }
     token = bool(os.getenv("TELEGRAM_BOT_TOKEN"))
     chat_id = bool(os.getenv("CLEAN_EMAIL_TELEGRAM_CHAT_ID") or os.getenv("TELEGRAM_CHAT_ID"))
+    mode = os.getenv("TELEGRAM_NOTIFY_MODE", "always").strip().lower()
+    only_if_deleted = os.getenv("TELEGRAM_NOTIFY_ONLY_IF_DELETED", "false").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
 
     if not gate:
-        return False, "disabled via SEND_TELEGRAM_NOTIFICATIONS"
+        return False, "disabled via SEND_TELEGRAM_NOTIFICATIONS", mode, only_if_deleted
     if not token:
-        return False, "TELEGRAM_BOT_TOKEN not set"
+        return False, "TELEGRAM_BOT_TOKEN not set", mode, only_if_deleted
     if not chat_id:
-        return False, "TELEGRAM_CHAT_ID not set"
-    return True, "configured"
+        return False, "TELEGRAM_CHAT_ID not set", mode, only_if_deleted
+    return True, "configured", mode, only_if_deleted
 
 
 def _get_last_run():
@@ -201,6 +206,16 @@ main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; display: grid; g
 .badge-ok    { background: var(--ok-dim);  color: var(--ok);   border: 1px solid var(--ok-border); }
 .badge-err   { background: var(--err-dim); color: var(--err);  border: 1px solid var(--err-border); }
 .badge-muted { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+.badge-count { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent); }
+
+/* ---- Card header with badge ---- */
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.card-header .card-title { margin-bottom: 0; }
 
 /* ---- Code ---- */
 code {
@@ -247,6 +262,50 @@ tbody tr:hover td { background: var(--surface2); }
 .dot-err { background: var(--err); box-shadow: 0 0 6px var(--err); }
 .dot-muted { background: var(--muted); }
 
+/* ---- Collapsible guide ---- */
+details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+summary {
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 600;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+summary::before {
+    content: '▶';
+    font-size: 0.6rem;
+    transition: transform 0.15s ease;
+    display: inline-block;
+}
+details[open] summary::before { transform: rotate(90deg); }
+details[open] summary { border-bottom: 1px solid var(--border); }
+.guide-body { padding: 1.5rem; overflow-x: auto; }
+.guide-body table { min-width: 560px; }
+.guide-body thead th { white-space: nowrap; }
+.guide-body td:first-child { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); white-space: nowrap; }
+.guide-body td:nth-child(2) { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+.guide-section-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 700;
+    padding: 0.9rem 0.85rem 0.3rem;
+    border-top: 1px solid var(--border);
+}
+.guide-section-label:first-child { border-top: none; padding-top: 0; }
+
 /* ---- Footer ---- */
 footer {
     text-align: center;
@@ -269,7 +328,7 @@ def _render_html():
     mailboxes = _get_mailbox_configs()
     cron_expr, schedule_desc = _get_schedule()
     last_run = _get_last_run()
-    tg_ok, tg_detail = _telegram_status()
+    tg_ok, tg_detail, tg_mode, tg_only_deleted = _telegram_status()
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # ---- Mailboxes table ----
@@ -332,6 +391,34 @@ def _render_html():
     tg_dot   = "dot-ok"  if tg_ok else "dot-muted"
     tg_label = "Enabled"  if tg_ok else "Disabled"
 
+    mode_label = "Digest" if tg_mode == "digest" else "Per run"
+    mode_badge = "badge-count" if tg_mode == "digest" else "badge-muted"
+
+    filter_label = "Only if deleted" if tg_only_deleted else "Always"
+    filter_badge = "badge-count" if tg_only_deleted else "badge-muted"
+
+    if tg_mode == "digest":
+        digest_min  = os.getenv("DIGEST_SCHEDULE_MIN", "0")
+        digest_hour = os.getenv("DIGEST_SCHEDULE_HOUR", "8")
+        digest_day  = os.getenv("DIGEST_SCHEDULE_DAY", "0")
+        day_names = {
+            "0": "Sunday", "1": "Monday", "2": "Tuesday", "3": "Wednesday",
+            "4": "Thursday", "5": "Friday", "6": "Saturday", "*": "every day",
+        }
+        try:
+            h, m = int(digest_hour), int(digest_min)
+            digest_schedule_html = (
+                f"<div class='stat-row'>"
+                f"<span class='stat-label'>Digest schedule</span>"
+                f"<span class='stat-value' style='font-size:0.82rem'>"
+                f"Every {escape(day_names.get(digest_day, f'day {digest_day}'))} at {h:02d}:{m:02d}"
+                f"</span></div>"
+            )
+        except ValueError:
+            digest_schedule_html = ""
+    else:
+        digest_schedule_html = ""
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -368,10 +455,6 @@ def _render_html():
                 <span class="stat-label">Human-readable</span>
                 <span class="stat-value">{escape(schedule_desc)}</span>
             </div>
-            <div class="stat-row">
-                <span class="stat-label">Mailboxes configured</span>
-                <span class="stat-value">{len(mailboxes)}</span>
-            </div>
         </section>
 
         <section class="card">
@@ -387,12 +470,24 @@ def _render_html():
                 <span class="stat-label">Detail</span>
                 <span class="stat-value" style="font-size:0.82rem;color:var(--muted)">{escape(tg_detail)}</span>
             </div>
+            <div class="stat-row">
+                <span class="stat-label">Notify mode</span>
+                <span class="stat-value"><span class="badge {mode_badge}">{mode_label}</span></span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Send condition</span>
+                <span class="stat-value"><span class="badge {filter_badge}">{filter_label}</span></span>
+            </div>
+            {digest_schedule_html}
         </section>
 
     </div>
 
     <section class="card">
-        <p class="card-title">Mailboxes</p>
+        <div class="card-header">
+            <p class="card-title">Mailboxes</p>
+            <span class="badge badge-count">{len(mailboxes)}</span>
+        </div>
         <div class="table-wrap">
             <table>
                 <thead>
@@ -410,6 +505,46 @@ def _render_html():
     </section>
 
     {last_run_html}
+
+    <details>
+        <summary>Environment Variables Reference</summary>
+        <div class="guide-body">
+            <table>
+                <thead>
+                    <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="3" class="guide-section-label">IMAP / Mailbox</td></tr>
+                    <tr><td>IMAP_SERVER</td><td>—</td><td>IMAP server hostname or IP. Required.</td></tr>
+                    <tr><td>IMAP_PORT</td><td>993</td><td>IMAP SSL port.</td></tr>
+                    <tr><td>EMAIL_USER</td><td>—</td><td>Username for IMAP login. Required.</td></tr>
+                    <tr><td>EMAIL_PASS</td><td>—</td><td>Password for IMAP login. Required.</td></tr>
+                    <tr><td>EMAIL_ADDRESS</td><td>EMAIL_USER</td><td>Display label for logs and notifications.</td></tr>
+                    <tr><td>MAILBOX</td><td>INBOX</td><td>IMAP folder to clean.</td></tr>
+                    <tr><td>CLEAN_DAYS</td><td>10</td><td>Delete emails older than this many days. Overridden by <code>--days</code> CLI argument.</td></tr>
+                    <tr><td>MAILBOX_CONFIGS</td><td>—</td><td>JSON array for multi-mailbox mode. Each entry: <code>imap_server</code>, <code>email_user</code>, <code>email_pass</code>, and optionally <code>imap_port</code>, <code>email_address</code>, <code>mailbox</code>, <code>clean_days</code>.</td></tr>
+                    <tr><td colspan="3" class="guide-section-label">Schedule (cron)</td></tr>
+                    <tr><td>SCHEDULE_MIN</td><td>0</td><td>Cron minute (0–59).</td></tr>
+                    <tr><td>SCHEDULE_HOUR</td><td>0</td><td>Cron hour (0–23).</td></tr>
+                    <tr><td>SCHEDULE_DAY</td><td>0</td><td>Cron weekday (0/7 = Sunday … 6 = Saturday, * = every day).</td></tr>
+                    <tr><td colspan="3" class="guide-section-label">Telegram Notifications</td></tr>
+                    <tr><td>SEND_TELEGRAM_NOTIFICATIONS</td><td>false</td><td>Enable Telegram notifications. Accepted: <code>1</code>, <code>true</code>, <code>yes</code>, <code>on</code>.</td></tr>
+                    <tr><td>TELEGRAM_BOT_TOKEN</td><td>—</td><td>Bot token from @BotFather. Required when notifications are enabled.</td></tr>
+                    <tr><td>TELEGRAM_CHAT_ID</td><td>—</td><td>Chat ID to send notifications to.</td></tr>
+                    <tr><td>CLEAN_EMAIL_TELEGRAM_CHAT_ID</td><td>—</td><td>Alternative chat ID; takes priority over <code>TELEGRAM_CHAT_ID</code>.</td></tr>
+                    <tr><td>TELEGRAM_TIMEOUT</td><td>10</td><td>Timeout in seconds for Telegram API calls.</td></tr>
+                    <tr><td>TELEGRAM_NOTIFY_MODE</td><td>always</td><td><code>always</code>: notify after every run. <code>digest</code>: accumulate results and send on a separate schedule.</td></tr>
+                    <tr><td>TELEGRAM_NOTIFY_ONLY_IF_DELETED</td><td>false</td><td>When <code>true</code>, skip notifications for runs where no emails were deleted.</td></tr>
+                    <tr><td colspan="3" class="guide-section-label">Digest Schedule (only when TELEGRAM_NOTIFY_MODE=digest)</td></tr>
+                    <tr><td>DIGEST_SCHEDULE_MIN</td><td>0</td><td>Cron minute for the digest send.</td></tr>
+                    <tr><td>DIGEST_SCHEDULE_HOUR</td><td>8</td><td>Cron hour for the digest send.</td></tr>
+                    <tr><td>DIGEST_SCHEDULE_DAY</td><td>0</td><td>Cron weekday for the digest send (same format as SCHEDULE_DAY).</td></tr>
+                    <tr><td colspan="3" class="guide-section-label">Web Status Page</td></tr>
+                    <tr><td>WEB_PORT</td><td>8080</td><td>Internal port for the web status page. Always started by the container; override only if 8080 conflicts.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </details>
 
 </main>
 
