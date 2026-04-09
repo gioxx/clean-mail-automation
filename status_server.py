@@ -218,16 +218,24 @@ main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; display: grid; g
 }
 .card-header .card-title { margin-bottom: 0; }
 
-/* ---- grid-2 height equalisation ---- */
-.grid-2 .card { display: flex; flex-direction: column; }
-.grid-2 .card .card-title { flex-shrink: 0; }
-.grid-2 .card .stat-row {
-    flex: 1;
-    margin-bottom: 0;
+/* ---- Mini-boxes inside cards ---- */
+.mini-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+}
+.mini-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.8rem;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    gap: 0.28rem;
 }
+.mini-box .stat-label { font-size: 0.72rem; color: var(--muted); }
+.mini-box .stat-value { font-size: 0.9rem; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; }
+.mini-box .stat-sub  { font-size: 0.76rem; color: var(--muted); }
 
 /* ---- Back-to-top button ---- */
 #totop {
@@ -523,17 +531,17 @@ def _render_html():
         }
         try:
             h, m = int(digest_hour), int(digest_min)
-            digest_schedule_html = (
-                f"<div class='stat-row'>"
+            digest_mini_box = (
+                f"<div class='mini-box'>"
                 f"<span class='stat-label'>Digest schedule</span>"
-                f"<span class='stat-value' style='font-size:0.82rem'>"
+                f"<span class='stat-value' style='font-size:0.85rem'>"
                 f"Every {escape(day_names.get(digest_day, f'day {digest_day}'))} at {h:02d}:{m:02d}"
                 f"</span></div>"
             )
         except ValueError:
-            digest_schedule_html = ""
+            digest_mini_box = ""
     else:
-        digest_schedule_html = ""
+        digest_mini_box = ""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -577,26 +585,25 @@ def _render_html():
 
         <section class="card">
             <p class="card-title">Notifications</p>
-            <div class="stat-row">
-                <span class="stat-label">Telegram</span>
-                <span class="stat-value">
-                    <span class="dot {tg_dot}"></span>
-                    <span class="badge {tg_badge}">{tg_label}</span>
-                </span>
+            <div class="mini-grid">
+                <div class="mini-box">
+                    <span class="stat-label">Telegram</span>
+                    <span class="stat-value">
+                        <span class="dot {tg_dot}"></span>
+                        <span class="badge {tg_badge}">{tg_label}</span>
+                    </span>
+                    <span class="stat-sub">{escape(tg_detail)}</span>
+                </div>
+                <div class="mini-box">
+                    <span class="stat-label">Notify mode</span>
+                    <span class="stat-value"><span class="badge {mode_badge}">{mode_label}</span></span>
+                </div>
+                <div class="mini-box">
+                    <span class="stat-label">Send condition</span>
+                    <span class="stat-value"><span class="badge {filter_badge}">{filter_label}</span></span>
+                </div>
+                {digest_mini_box}
             </div>
-            <div class="stat-row">
-                <span class="stat-label">Detail</span>
-                <span class="stat-value" style="font-size:0.82rem;color:var(--muted)">{escape(tg_detail)}</span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-label">Notify mode</span>
-                <span class="stat-value"><span class="badge {mode_badge}">{mode_label}</span></span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-label">Send condition</span>
-                <span class="stat-value"><span class="badge {filter_badge}">{filter_label}</span></span>
-            </div>
-            {digest_schedule_html}
         </section>
 
     </div>
