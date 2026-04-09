@@ -15,6 +15,7 @@ from html import escape
 
 STATE_FILE = "/tmp/clean_mail_last_run.json"
 DEFAULT_MAILBOX = "INBOX"
+APP_VERSION = "0.3.2"
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +218,40 @@ main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; display: grid; g
 }
 .card-header .card-title { margin-bottom: 0; }
 
+/* ---- grid-2 height equalisation ---- */
+.grid-2 .card { display: flex; flex-direction: column; }
+.grid-2 .card .card-title { flex-shrink: 0; }
+.grid-2 .card .stat-row {
+    flex: 1;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* ---- Back-to-top button ---- */
+#totop {
+    position: fixed;
+    bottom: 1.75rem;
+    right: 1.75rem;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+    transition: background 0.2s, transform 0.15s;
+    z-index: 999;
+    line-height: 1;
+}
+#totop:hover { background: #2563eb; transform: translateY(-2px); }
+
 /* ---- Code ---- */
 code {
     background: var(--surface2);
@@ -296,15 +331,17 @@ details[open] summary { border-bottom: 1px solid var(--border); }
 .guide-body td:first-child { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); white-space: nowrap; }
 .guide-body td:nth-child(2) { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
 .guide-section-label {
-    font-size: 0.65rem;
+    font-size: 0.72rem;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
+    letter-spacing: 0.09em;
+    color: var(--text);
     font-weight: 700;
-    padding: 0.9rem 0.85rem 0.3rem;
+    padding: 0.7rem 0.85rem 0.4rem 1rem;
     border-top: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    background: var(--surface2);
 }
-.guide-section-label:first-child { border-top: none; padding-top: 0; }
+.guide-section-label:first-child { border-top: none; }
 
 /* ---- Footer ---- */
 footer {
@@ -316,6 +353,84 @@ footer {
     margin-top: 1rem;
 }
 """
+
+def _active_env_vars():
+    """Return set of env var names currently set to a non-empty value."""
+    candidates = (
+        "IMAP_SERVER", "IMAP_PORT", "EMAIL_USER", "EMAIL_PASS",
+        "EMAIL_ADDRESS", "MAILBOX", "CLEAN_DAYS", "MAILBOX_CONFIGS",
+        "SEND_TELEGRAM_NOTIFICATIONS", "TELEGRAM_BOT_TOKEN",
+        "CLEAN_EMAIL_TELEGRAM_CHAT_ID", "TELEGRAM_CHAT_ID", "TELEGRAM_TIMEOUT",
+        "TELEGRAM_NOTIFY_MODE", "TELEGRAM_NOTIFY_ONLY_IF_DELETED",
+        "SCHEDULE_MIN", "SCHEDULE_HOUR", "SCHEDULE_DAY",
+        "DIGEST_SCHEDULE_MIN", "DIGEST_SCHEDULE_HOUR", "DIGEST_SCHEDULE_DAY",
+        "WEB_PORT",
+    )
+    return {k for k in candidates if os.getenv(k)}
+
+
+def _render_guide(active_vars):
+    """Return the collapsible env vars reference HTML."""
+    def row(var, default, desc):
+        dot = (
+            "<span class='dot dot-ok' title='Set in this container' "
+            "style='margin-right:0.35rem;vertical-align:middle'></span>"
+            if var in active_vars else
+            "<span class='dot dot-muted' title='Not configured' "
+            "style='margin-right:0.35rem;vertical-align:middle'></span>"
+        )
+        return (
+            f"<tr><td>{dot}{escape(var)}</td>"
+            f"<td>{escape(str(default))}</td>"
+            f"<td>{desc}</td></tr>"
+        )
+
+    def section(label):
+        return f"<tr><td colspan='3' class='guide-section-label'>{escape(label)}</td></tr>"
+
+    rows = "".join([
+        section("IMAP / Mailbox"),
+        row("IMAP_SERVER",    "—",         "IMAP server hostname or IP. <strong>Required.</strong>"),
+        row("IMAP_PORT",      "993",        "IMAP SSL port."),
+        row("EMAIL_USER",     "—",         "<strong>Required.</strong> Username for IMAP login."),
+        row("EMAIL_PASS",     "—",         "<strong>Required.</strong> Password for IMAP login."),
+        row("EMAIL_ADDRESS",  "EMAIL_USER", "Display label used in logs and notifications."),
+        row("MAILBOX",        "INBOX",      "IMAP folder to clean."),
+        row("CLEAN_DAYS",     "10",         "Delete emails older than this many days. Overridden by <code>--days</code> CLI argument."),
+        row("MAILBOX_CONFIGS","—",          "JSON array for multi-mailbox mode. Each entry: <code>imap_server</code>, <code>email_user</code>, <code>email_pass</code>, and optionally <code>imap_port</code>, <code>email_address</code>, <code>mailbox</code>, <code>clean_days</code>."),
+        section("Schedule (cron)"),
+        row("SCHEDULE_MIN",   "0",  "Cron minute (0–59)."),
+        row("SCHEDULE_HOUR",  "0",  "Cron hour (0–23)."),
+        row("SCHEDULE_DAY",   "0",  "Cron weekday — 0/7 = Sunday … 6 = Saturday. Use <code>*</code> for every day."),
+        section("Telegram Notifications"),
+        row("SEND_TELEGRAM_NOTIFICATIONS", "false", "Enable Telegram notifications. Accepted: <code>1</code>, <code>true</code>, <code>yes</code>, <code>on</code>."),
+        row("TELEGRAM_BOT_TOKEN",          "—",     "Bot token from @BotFather. Required when notifications are enabled."),
+        row("TELEGRAM_CHAT_ID",            "—",     "Chat ID to send notifications to."),
+        row("CLEAN_EMAIL_TELEGRAM_CHAT_ID","—",     "Alternative chat ID; takes priority over <code>TELEGRAM_CHAT_ID</code>."),
+        row("TELEGRAM_TIMEOUT",            "10",    "Timeout in seconds for Telegram API calls."),
+        row("TELEGRAM_NOTIFY_MODE",        "always","<code>always</code>: notify after every run. <code>digest</code>: accumulate results and send on a separate schedule."),
+        row("TELEGRAM_NOTIFY_ONLY_IF_DELETED","false","When <code>true</code>, skip notifications for runs where no emails were deleted."),
+        section("Digest Schedule (TELEGRAM_NOTIFY_MODE=digest only)"),
+        row("DIGEST_SCHEDULE_MIN",  "0", "Cron minute for the digest send."),
+        row("DIGEST_SCHEDULE_HOUR", "8", "Cron hour for the digest send."),
+        row("DIGEST_SCHEDULE_DAY",  "0", "Cron weekday for the digest send (same format as <code>SCHEDULE_DAY</code>)."),
+        section("Web Status Page"),
+        row("WEB_PORT", "8080", "Internal port for the status page. Always started by the container; override only if 8080 conflicts."),
+    ])
+
+    return f"""
+    <details>
+        <summary>Environment Variables Reference</summary>
+        <div class="guide-body">
+            <table>
+                <thead>
+                    <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+                </thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>
+    </details>"""
+
 
 _ENVELOPE_ICON = """<svg width="22" height="22" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -329,6 +444,7 @@ def _render_html():
     cron_expr, schedule_desc = _get_schedule()
     last_run = _get_last_run()
     tg_ok, tg_detail, tg_mode, tg_only_deleted = _telegram_status()
+    active_vars = _active_env_vars()
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # ---- Mailboxes table ----
@@ -426,6 +542,7 @@ def _render_html():
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="refresh" content="60">
     <title>Clean Mail Automation</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='4' width='20' height='16' rx='2' fill='%230f172a'/%3E%3Cpath d='m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7'/%3E%3C/svg%3E">
     <style>{_CSS}</style>
 </head>
 <body>
@@ -434,6 +551,7 @@ def _render_html():
     <div class="logo">
         {_ENVELOPE_ICON}
         <h1>Clean <em>Mail</em> Automation</h1>
+        <span class="badge badge-muted" style="font-size:0.68rem;margin-left:0.25rem">v{APP_VERSION}</span>
     </div>
     <div class="meta">
         Auto-refreshes every 60&thinsp;s<br>
@@ -506,47 +624,17 @@ def _render_html():
 
     {last_run_html}
 
-    <details>
-        <summary>Environment Variables Reference</summary>
-        <div class="guide-body">
-            <table>
-                <thead>
-                    <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td colspan="3" class="guide-section-label">IMAP / Mailbox</td></tr>
-                    <tr><td>IMAP_SERVER</td><td>—</td><td>IMAP server hostname or IP. Required.</td></tr>
-                    <tr><td>IMAP_PORT</td><td>993</td><td>IMAP SSL port.</td></tr>
-                    <tr><td>EMAIL_USER</td><td>—</td><td>Username for IMAP login. Required.</td></tr>
-                    <tr><td>EMAIL_PASS</td><td>—</td><td>Password for IMAP login. Required.</td></tr>
-                    <tr><td>EMAIL_ADDRESS</td><td>EMAIL_USER</td><td>Display label for logs and notifications.</td></tr>
-                    <tr><td>MAILBOX</td><td>INBOX</td><td>IMAP folder to clean.</td></tr>
-                    <tr><td>CLEAN_DAYS</td><td>10</td><td>Delete emails older than this many days. Overridden by <code>--days</code> CLI argument.</td></tr>
-                    <tr><td>MAILBOX_CONFIGS</td><td>—</td><td>JSON array for multi-mailbox mode. Each entry: <code>imap_server</code>, <code>email_user</code>, <code>email_pass</code>, and optionally <code>imap_port</code>, <code>email_address</code>, <code>mailbox</code>, <code>clean_days</code>.</td></tr>
-                    <tr><td colspan="3" class="guide-section-label">Schedule (cron)</td></tr>
-                    <tr><td>SCHEDULE_MIN</td><td>0</td><td>Cron minute (0–59).</td></tr>
-                    <tr><td>SCHEDULE_HOUR</td><td>0</td><td>Cron hour (0–23).</td></tr>
-                    <tr><td>SCHEDULE_DAY</td><td>0</td><td>Cron weekday (0/7 = Sunday … 6 = Saturday, * = every day).</td></tr>
-                    <tr><td colspan="3" class="guide-section-label">Telegram Notifications</td></tr>
-                    <tr><td>SEND_TELEGRAM_NOTIFICATIONS</td><td>false</td><td>Enable Telegram notifications. Accepted: <code>1</code>, <code>true</code>, <code>yes</code>, <code>on</code>.</td></tr>
-                    <tr><td>TELEGRAM_BOT_TOKEN</td><td>—</td><td>Bot token from @BotFather. Required when notifications are enabled.</td></tr>
-                    <tr><td>TELEGRAM_CHAT_ID</td><td>—</td><td>Chat ID to send notifications to.</td></tr>
-                    <tr><td>CLEAN_EMAIL_TELEGRAM_CHAT_ID</td><td>—</td><td>Alternative chat ID; takes priority over <code>TELEGRAM_CHAT_ID</code>.</td></tr>
-                    <tr><td>TELEGRAM_TIMEOUT</td><td>10</td><td>Timeout in seconds for Telegram API calls.</td></tr>
-                    <tr><td>TELEGRAM_NOTIFY_MODE</td><td>always</td><td><code>always</code>: notify after every run. <code>digest</code>: accumulate results and send on a separate schedule.</td></tr>
-                    <tr><td>TELEGRAM_NOTIFY_ONLY_IF_DELETED</td><td>false</td><td>When <code>true</code>, skip notifications for runs where no emails were deleted.</td></tr>
-                    <tr><td colspan="3" class="guide-section-label">Digest Schedule (only when TELEGRAM_NOTIFY_MODE=digest)</td></tr>
-                    <tr><td>DIGEST_SCHEDULE_MIN</td><td>0</td><td>Cron minute for the digest send.</td></tr>
-                    <tr><td>DIGEST_SCHEDULE_HOUR</td><td>8</td><td>Cron hour for the digest send.</td></tr>
-                    <tr><td>DIGEST_SCHEDULE_DAY</td><td>0</td><td>Cron weekday for the digest send (same format as SCHEDULE_DAY).</td></tr>
-                    <tr><td colspan="3" class="guide-section-label">Web Status Page</td></tr>
-                    <tr><td>WEB_PORT</td><td>8080</td><td>Internal port for the web status page. Always started by the container; override only if 8080 conflicts.</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </details>
+    {_render_guide(active_vars)}
 
 </main>
+
+<button id="totop" onclick="window.scrollTo({{top:0,behavior:'smooth'}})" title="Back to top" aria-label="Back to top">&#8679;</button>
+
+<script>
+window.addEventListener('scroll', function() {{
+    document.getElementById('totop').style.display = window.scrollY > 300 ? 'flex' : 'none';
+}});
+</script>
 
 <footer>
     <a href="https://github.com/gioxx/clean-mail-automation" target="_blank" rel="noopener">

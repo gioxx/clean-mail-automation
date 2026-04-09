@@ -20,9 +20,37 @@ A Docker container to automatically clean an IMAP email inbox by deleting all em
 
 ## Prerequisites
 
+### Running with Docker (recommended)
+
 - Docker installed on your system
 - IMAP email account with credentials ready
 - Basic understanding of Docker image build and container run
+
+### Running the script directly (without Docker)
+
+`clean_email.py` has **no external dependencies** — it uses Python stdlib only. You can run it on any system with Python 3.8+:
+
+```bash
+# Set required environment variables
+export IMAP_SERVER="imap.server.com"
+export EMAIL_USER="your_username"
+export EMAIL_PASS="your_password"
+
+# Optional variables
+export EMAIL_ADDRESS="mailbox@example.com"
+export CLEAN_DAYS=10
+export SEND_TELEGRAM_NOTIFICATIONS=true
+export TELEGRAM_BOT_TOKEN="123456:ABCDEF"
+export TELEGRAM_CHAT_ID="987654321"
+
+# Run
+python3 clean_email.py
+
+# Or override retention days inline
+python3 clean_email.py --days 30
+```
+
+When running directly, scheduling is handled externally (e.g. your system cron). The web status page (`status_server.py`) is **not** started automatically — it is only launched by `entrypoint.sh` inside the Docker container.
 
 ---
 
