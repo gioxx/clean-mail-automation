@@ -318,20 +318,31 @@ def _accumulate_for_digest(result):
         logging.warning("Could not write digest file %s: %s", DIGEST_FILE, error)
 
 
-def send_and_clear_digest():
+def send_and_clear_digest(force=False):
     try:
         with open(DIGEST_FILE) as f:
             data = json.load(f)
     except FileNotFoundError:
-        logging.info("Digest: no accumulated data found, nothing to send.")
-        return
+        data = {"runs": []}
     except json.JSONDecodeError as error:
         logging.error("Digest: could not read digest file: %s", error)
         return
 
     runs = data.get("runs", [])
     if not runs:
-        logging.info("Digest: no runs accumulated, nothing to send.")
+        if not force:
+            logging.info("Digest: no runs accumulated, nothing to send.")
+            return
+        # Forced send with no data: notify explicitly that nothing was deleted.
+        sent = send_telegram_message(
+            "Email Cleanup Digest (manual)\n"
+            "No emails were deleted since the last digest.\n"
+            "Nothing to report."
+        )
+        if sent:
+            logging.info("Digest (forced, empty) sent successfully.")
+        else:
+            logging.error("Digest (forced, empty) send failed.")
         return
 
     # Aggregate per mailbox
@@ -349,8 +360,9 @@ def send_and_clear_digest():
     period_end = runs[-1]["timestamp"]
     total_deleted = sum(r.get("deleted_count", 0) for r in runs)
 
+    header = "Email Cleanup Digest (manual)" if force else "Email Cleanup Digest"
     lines = [
-        "Email Cleanup Digest",
+        header,
         f"Period: {period_start} \u2013 {period_end}",
         f"Total runs: {len(runs)} | Total deleted: {total_deleted}",
         "",
@@ -410,10 +422,15 @@ if __name__ == "__main__":
         action="store_true",
         help="Send the accumulated digest notification and clear the digest file, then exit.",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Used with --send-digest: send even if empty, ignoring NOTIFY_ONLY_IF_DELETED.",
+    )
     args = parser.parse_args()
 
     if args.send_digest:
-        send_and_clear_digest()
+        send_and_clear_digest(force=args.force)
         sys.exit(0)
 
     mailbox_configs = load_mailbox_configs(args.days)

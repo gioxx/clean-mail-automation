@@ -238,14 +238,9 @@ main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; display: grid; g
 .mini-box .stat-label { font-size: 0.72rem; color: var(--muted); }
 .mini-box .stat-value { font-size: 0.9rem; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; }
 .mini-box .stat-sub  { font-size: 0.76rem; color: var(--muted); }
+.mini-actions { display: flex; gap: 0.4rem; margin-top: 0.4rem; flex-wrap: wrap; }
 
-/* ---- Action bar ---- */
-.action-bar {
-    display: flex;
-    gap: 0.6rem;
-    justify-content: flex-end;
-    margin-top: -0.25rem;
-}
+/* ---- Action buttons ---- */
 .btn-action {
     display: inline-flex;
     align-items: center;
@@ -452,6 +447,8 @@ def _render_guide(active_vars):
         row("DIGEST_SCHEDULE_DAY",  "0", "Cron weekday for the digest send (same format as <code>SCHEDULE_DAY</code>)."),
         section("Web Status Page"),
         row("WEB_PORT", "8080", "Internal port for the status page. Always started by the container; override only if 8080 conflicts."),
+        section("Timezone"),
+        row("TZ", "UTC", "Container timezone. Affects all timestamps written by the script (e.g. Last Run). Example: <code>Europe/Rome</code>, <code>America/New_York</code>. The status page clock always uses the browser's local time regardless of this setting."),
     ])
 
     return f"""
@@ -622,6 +619,16 @@ def _render_html():
                         {tg_label}
                     </span>
                     <span class="stat-sub">{escape(tg_detail)}</span>
+                    {f"""<div class="mini-actions">
+                        <a class="btn-action" href="/action/test-notify" onclick="return confirm('Send a test Telegram notification?')">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                            Test
+                        </a>
+                        <a class="btn-action" href="/action/send-digest" onclick="return confirm('Send the accumulated digest now and clear it?')">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+                            Digest
+                        </a>
+                    </div>""" if tg_ok else ""}
                 </div>
                 <div class="mini-box">
                     <span class="stat-label">Notify mode</span>
@@ -636,17 +643,6 @@ def _render_html():
         </section>
 
     </div>
-
-    {f"""<div class="action-bar">
-        <a class="btn-action" href="/action/test-notify" onclick="return confirm('Send a test Telegram notification?')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-            Test notification
-        </a>
-        <a class="btn-action" href="/action/send-digest" onclick="return confirm('Send the accumulated digest now and clear it?')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-            Send digest now
-        </a>
-    </div>""" if tg_ok else ""}
 
     <section class="card">
         <div class="card-header">
@@ -770,7 +766,7 @@ class _StatusHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(body)
 
         elif self.path == "/action/send-digest":
-            ok, out = _run_action(["--send-digest"])
+            ok, out = _run_action(["--send-digest", "--force"])
             print(f"[action/send-digest] ok={ok} {out}", flush=True)
             self.send_response(302)
             self.send_header("Location", "/")

@@ -177,6 +177,7 @@ docker run -d \
 | `DIGEST_SCHEDULE_HOUR` | container entrypoint | No | `8` | Digest send cron hour. Only used when `TELEGRAM_NOTIFY_MODE=digest`. |
 | `DIGEST_SCHEDULE_DAY` | container entrypoint | No | `0` | Digest send cron weekday (same format as `SCHEDULE_DAY`). Only used when `TELEGRAM_NOTIFY_MODE=digest`. |
 | `WEB_PORT` | container entrypoint | No | `8080` | Port the web status page listens on inside the container. Always started; override only if port `8080` conflicts. |
+| `TZ` | container OS | No | `UTC` | Container timezone. Affects all timestamps written by the script (Last Run, digest period, logs). Example: `Europe/Rome`, `America/New_York`. The status page clock always uses the browser's local time regardless of this setting. |
 
 `SCHEDULE_DAY=1`, `SCHEDULE_HOUR=1`, `SCHEDULE_MIN=30` means: every Monday at 01:30.
 

@@ -27,6 +27,9 @@ services:
     restart: unless-stopped
 
     environment:
+      # ── Timezone ──────────────────────────────────────────────
+      - TZ=Europe/Rome                       # affects Last Run timestamps
+
       # ── IMAP ──────────────────────────────────────────────────
       - IMAP_SERVER=imap.example.com
       - IMAP_PORT=993

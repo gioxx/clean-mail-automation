@@ -37,6 +37,9 @@ services:
     restart: unless-stopped
 
     environment:
+      # ── Timezone ──────────────────────────────────────────────
+      - TZ=Europe/Rome                       # affects Last Run timestamps
+
       # ── Multi-mailbox config (JSON array, one line) ────────────
       # Passwords come from env vars — define them in .env or Portainer.
       - MAILBOX_CONFIGS=[{"imap_server":"imap.example.com","imap_port":993,"email_user":"user1@example.com","email_pass":"${USER1_PASS}","email_address":"user1@example.com","mailbox":"INBOX","clean_days":10},{"imap_server":"imap.example.com","imap_port":993,"email_user":"user2@example.com","email_pass":"${USER2_PASS}","email_address":"user2@example.com","mailbox":"INBOX","clean_days":30},{"imap_server":"imap.other.com","imap_port":993,"email_user":"user3@other.com","email_pass":"${USER3_PASS}","email_address":"user3@other.com","mailbox":"Archive","clean_days":60}]
