@@ -539,7 +539,7 @@ def _render_html():
 
     tg_badge = "badge-ok" if tg_ok else "badge-muted"
     tg_dot   = "dot-ok"  if tg_ok else "dot-muted"
-    tg_label = "Enabled"  if tg_ok else "Disabled"
+    tg_label = "Enabled" if tg_ok else "Not configured"
 
     mode_label = "Digest" if tg_mode == "digest" else "Per run"
     mode_badge = "badge-count" if tg_mode == "digest" else "badge-muted"
@@ -622,7 +622,6 @@ def _render_html():
                                 <span class="dot {tg_dot}"></span>
                                 {tg_label}
                             </span>
-                            {f"<span class='stat-sub'>{escape(tg_detail)}</span>" if not tg_ok else ""}
                         </div>
                         {f"""<div class="mini-actions">
                             <a class="btn-action" href="/action/test-notify" onclick="return confirm('Send a test Telegram notification?')">
@@ -683,7 +682,7 @@ def _render_html():
 
 </main>
 
-<button id="totop" onclick="window.scrollTo({{top:0,behavior:'smooth'}})" title="Back to top" aria-label="Back to top">&#8679;</button>
+<button id="totop" onclick="window.scrollTo({{top:0,behavior:'smooth'}})" title="Back to top" aria-label="Back to top">&#9650;</button>
 
 <script>
 // ---- Clock (browser local time) ----
