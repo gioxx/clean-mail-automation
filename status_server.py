@@ -453,7 +453,6 @@ def _render_html():
     last_run = _get_last_run()
     tg_ok, tg_detail, tg_mode, tg_only_deleted = _telegram_status()
     active_vars = _active_env_vars()
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # ---- Mailboxes table ----
     mb_rows = ""
@@ -563,7 +562,7 @@ def _render_html():
     </div>
     <div class="meta">
         Auto-refreshes every 60&thinsp;s<br>
-        {escape(now)}
+        <span id="clock"></span>
     </div>
 </header>
 
@@ -638,9 +637,36 @@ def _render_html():
 <button id="totop" onclick="window.scrollTo({{top:0,behavior:'smooth'}})" title="Back to top" aria-label="Back to top">&#8679;</button>
 
 <script>
+// ---- Clock (browser local time) ----
+function _tick() {{
+    var d = new Date();
+    var pad = function(n) {{ return n.toString().padStart(2,'0'); }};
+    document.getElementById('clock').textContent =
+        d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) +
+        ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}}
+_tick();
+setInterval(_tick, 1000);
+
+// ---- Back-to-top ----
 window.addEventListener('scroll', function() {{
     document.getElementById('totop').style.display = window.scrollY > 300 ? 'flex' : 'none';
 }});
+
+// ---- Guide: persist open/closed state + smooth scroll on open ----
+(function() {{
+    var details = document.querySelector('details');
+    if (!details) return;
+    if (localStorage.getItem('guide_open') === '1') details.open = true;
+    details.addEventListener('toggle', function() {{
+        localStorage.setItem('guide_open', details.open ? '1' : '0');
+        if (details.open) {{
+            setTimeout(function() {{
+                details.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+            }}, 50);
+        }}
+    }});
+}})();
 </script>
 
 <footer>
