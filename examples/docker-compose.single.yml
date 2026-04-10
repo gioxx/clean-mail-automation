@@ -1,9 +1,21 @@
 # docker-compose.single.yml
 # Single-mailbox example with Telegram notifications.
 #
+# Passwords and tokens are read from environment variables so they never
+# appear in plain text in this file. Define them in a .env file alongside
+# this compose file, or in the "Environment variables" panel in Portainer:
+#
+#   IMAP_PASS=your_imap_password
+#   TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
+#   TELEGRAM_CHAT_ID=987654321
+#
+# IMPORTANT — Portainer users: do NOT stop the existing stack manually before
+# redeploying; just click "Update the stack". If a container name or port
+# conflict causes a 500 error, stop and remove the old stack first.
+#
 # Usage:
 #   cp examples/docker-compose.single.yml docker-compose.yml
-#   # Edit the values below, then:
+#   # Fill in your .env file, then:
 #   docker compose up -d
 #
 # Status page: http://localhost:8080
@@ -19,7 +31,7 @@ services:
       - IMAP_SERVER=imap.example.com
       - IMAP_PORT=993
       - EMAIL_USER=youruser@example.com
-      - EMAIL_PASS=your_imap_password
+      - EMAIL_PASS=${IMAP_PASS}
       - EMAIL_ADDRESS=youruser@example.com   # label used in logs/notifications
       - MAILBOX=INBOX                        # IMAP folder to clean
       - CLEAN_DAYS=10                        # delete emails older than N days
@@ -32,8 +44,8 @@ services:
 
       # ── Telegram notifications ─────────────────────────────────
       - SEND_TELEGRAM_NOTIFICATIONS=true
-      - TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
-      - TELEGRAM_CHAT_ID=987654321
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       # Notify mode: "always" sends after every run
       - TELEGRAM_NOTIFY_MODE=always
       # Set to "true" to skip notifications when nothing was deleted

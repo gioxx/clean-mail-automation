@@ -9,9 +9,23 @@
 # Notifications are sent as a weekly digest every Sunday at 08:00
 # and only when at least one email was actually deleted.
 #
+# Passwords and tokens are read from environment variables so they never
+# appear in plain text in this file. Define them in a .env file alongside
+# this compose file, or in the "Environment variables" panel in Portainer:
+#
+#   USER1_PASS=secret1
+#   USER2_PASS=secret2
+#   USER3_PASS=secret3
+#   TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
+#   TELEGRAM_CHAT_ID=987654321
+#
+# IMPORTANT — Portainer users: do NOT stop the existing stack manually before
+# redeploying; just click "Update the stack". If a container name or port
+# conflict causes a 500 error, stop and remove the old stack first.
+#
 # Usage:
 #   cp examples/docker-compose.multi.yml docker-compose.yml
-#   # Edit the values below, then:
+#   # Fill in your .env file, then:
 #   docker compose up -d
 #
 # Status page: http://localhost:8080
@@ -23,8 +37,9 @@ services:
     restart: unless-stopped
 
     environment:
-      # ── Multi-mailbox config (JSON array, must be on one line) ─
-      - MAILBOX_CONFIGS=[{"imap_server":"imap.example.com","imap_port":993,"email_user":"user1@example.com","email_pass":"pass_user1","email_address":"user1@example.com","mailbox":"INBOX","clean_days":10},{"imap_server":"imap.example.com","imap_port":993,"email_user":"user2@example.com","email_pass":"pass_user2","email_address":"user2@example.com","mailbox":"INBOX","clean_days":30},{"imap_server":"imap.other.com","imap_port":993,"email_user":"user3@other.com","email_pass":"pass_user3","email_address":"user3@other.com","mailbox":"Archive","clean_days":60}]
+      # ── Multi-mailbox config (JSON array, one line) ────────────
+      # Passwords come from env vars — define them in .env or Portainer.
+      - MAILBOX_CONFIGS=[{"imap_server":"imap.example.com","imap_port":993,"email_user":"user1@example.com","email_pass":"${USER1_PASS}","email_address":"user1@example.com","mailbox":"INBOX","clean_days":10},{"imap_server":"imap.example.com","imap_port":993,"email_user":"user2@example.com","email_pass":"${USER2_PASS}","email_address":"user2@example.com","mailbox":"INBOX","clean_days":30},{"imap_server":"imap.other.com","imap_port":993,"email_user":"user3@other.com","email_pass":"${USER3_PASS}","email_address":"user3@other.com","mailbox":"Archive","clean_days":60}]
 
       # ── Schedule (cron inside the container) ──────────────────
       # Every day at 02:00
@@ -34,8 +49,8 @@ services:
 
       # ── Telegram notifications ─────────────────────────────────
       - SEND_TELEGRAM_NOTIFICATIONS=true
-      - TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
-      - TELEGRAM_CHAT_ID=987654321
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       # Digest mode: accumulate results and send once a week
       - TELEGRAM_NOTIFY_MODE=digest
       # Only notify when something was actually deleted
