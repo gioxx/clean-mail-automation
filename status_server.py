@@ -246,8 +246,8 @@ main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; display: grid; g
 .btn-action {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.3rem 0.75rem;
+    gap: 0.4rem;
+    padding: 0.4rem 0.9rem;
     border-radius: 9999px;
     border: 1px solid var(--border);
     background: var(--surface);
@@ -397,7 +397,7 @@ def _active_env_vars():
         "TELEGRAM_NOTIFY_MODE", "TELEGRAM_NOTIFY_ONLY_IF_DELETED",
         "SCHEDULE_MIN", "SCHEDULE_HOUR", "SCHEDULE_DAY",
         "DIGEST_SCHEDULE_MIN", "DIGEST_SCHEDULE_HOUR", "DIGEST_SCHEDULE_DAY",
-        "WEB_PORT",
+        "WEB_PORT", "TZ",
     )
     return {k for k in candidates if os.getenv(k)}
 
@@ -629,16 +629,22 @@ def _render_html():
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                                 Test
                             </a>
-                            <a class="btn-action" href="/action/send-digest" onclick="return confirm('Send the accumulated digest now and clear it?')">
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-                                Digest
-                            </a>
                         </div>""" if tg_ok else ""}
                     </div>
                 </div>
                 <div class="mini-box">
-                    <span class="stat-label">Notify mode</span>
-                    <span class="stat-value">{mode_label}</span>
+                    <div class="mini-box-split">
+                        <div class="mini-box-main">
+                            <span class="stat-label">Notify mode</span>
+                            <span class="stat-value">{mode_label}</span>
+                        </div>
+                        {f"""<div class="mini-actions">
+                            <a class="btn-action" href="/action/send-digest" onclick="return confirm('Send the accumulated digest now and clear it?')">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+                                Send now
+                            </a>
+                        </div>""" if tg_ok and tg_mode == "digest" else ""}
+                    </div>
                 </div>
                 <div class="mini-box">
                     <span class="stat-label">Send condition</span>
