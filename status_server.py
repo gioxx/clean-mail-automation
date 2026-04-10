@@ -590,17 +590,17 @@ def _render_html():
                     <span class="stat-label">Telegram</span>
                     <span class="stat-value">
                         <span class="dot {tg_dot}"></span>
-                        <span class="badge {tg_badge}">{tg_label}</span>
+                        {tg_label}
                     </span>
                     <span class="stat-sub">{escape(tg_detail)}</span>
                 </div>
                 <div class="mini-box">
                     <span class="stat-label">Notify mode</span>
-                    <span class="stat-value"><span class="badge {mode_badge}">{mode_label}</span></span>
+                    <span class="stat-value">{mode_label}</span>
                 </div>
                 <div class="mini-box">
                     <span class="stat-label">Send condition</span>
-                    <span class="stat-value"><span class="badge {filter_badge}">{filter_label}</span></span>
+                    <span class="stat-value">{filter_label}</span>
                 </div>
                 {digest_mini_box}
             </div>
