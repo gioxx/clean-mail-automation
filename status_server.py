@@ -622,7 +622,7 @@ def _render_html():
                                 <span class="dot {tg_dot}"></span>
                                 {tg_label}
                             </span>
-                            <span class="stat-sub">{escape(tg_detail)}</span>
+                            {f"<span class='stat-sub'>{escape(tg_detail)}</span>" if not tg_ok else ""}
                         </div>
                         {f"""<div class="mini-actions">
                             <a class="btn-action" href="/action/test-notify" onclick="return confirm('Send a test Telegram notification?')">
