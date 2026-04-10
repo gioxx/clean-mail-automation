@@ -242,6 +242,55 @@ ports:
   - "3200:8080"
 ```
 
+### docker-compose example — multi-mailbox
+
+Use `MAILBOX_CONFIGS` as a JSON array to clean multiple mailboxes in a single container. Each entry can target a different server, folder, and retention period:
+
+```yaml
+services:
+  email-cleaner:
+    image: ghcr.io/gioxx/clean-mail-automation:latest
+    environment:
+      - MAILBOX_CONFIGS=[
+          {"imap_server":"imap.server.com","email_user":"user1@example.com","email_pass":"pass1","email_address":"user1@example.com","mailbox":"INBOX","clean_days":10},
+          {"imap_server":"imap.server.com","email_user":"user2@example.com","email_pass":"pass2","email_address":"user2@example.com","mailbox":"INBOX","clean_days":30},
+          {"imap_server":"imap.other.com","email_user":"user3@example.com","email_pass":"pass3","email_address":"user3@example.com","mailbox":"Archive","clean_days":60}
+        ]
+      - SCHEDULE_DAY=1
+      - SCHEDULE_HOUR=1
+      - SCHEDULE_MIN=30
+      - SEND_TELEGRAM_NOTIFICATIONS=true
+      - TELEGRAM_BOT_TOKEN=123456:ABCDEF
+      - TELEGRAM_CHAT_ID=987654321
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+```
+
+> **Note:** Docker Compose requires the `MAILBOX_CONFIGS` value to be on a single line or use a block scalar. The multi-line format above is for readability — in a real `.env` file or compose, write it as a single line or use the `env_file` option with proper quoting.
+
+If you prefer keeping credentials out of the compose file, use an `.env` file:
+
+```bash
+# .env
+MAILBOX_CONFIGS=[{"imap_server":"imap.server.com","email_user":"user1@example.com","email_pass":"pass1","mailbox":"INBOX","clean_days":10},{"imap_server":"imap.server.com","email_user":"user2@example.com","email_pass":"pass2","mailbox":"INBOX","clean_days":30}]
+```
+
+```yaml
+# docker-compose.yml
+services:
+  email-cleaner:
+    image: ghcr.io/gioxx/clean-mail-automation:latest
+    env_file: .env
+    environment:
+      - SCHEDULE_DAY=1
+      - SCHEDULE_HOUR=1
+      - SCHEDULE_MIN=30
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+```
+
 ---
 
 ## Telegram Notifications
