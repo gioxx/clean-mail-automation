@@ -11,6 +11,8 @@ import http.server
 import json
 import os
 import socketserver
+import subprocess
+import sys
 from html import escape
 
 STATE_FILE = "/tmp/clean_mail_last_run.json"
@@ -184,7 +186,7 @@ main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; display: grid; g
     font-weight: 600;
     margin-bottom: 1rem;
 }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.grid-2 { display: grid; grid-template-columns: 35fr 65fr; gap: 1.25rem; }
 @media (max-width: 660px) { .grid-2 { grid-template-columns: 1fr; } }
 
 /* ---- Stat rows ---- */
@@ -236,6 +238,32 @@ main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; display: grid; g
 .mini-box .stat-label { font-size: 0.72rem; color: var(--muted); }
 .mini-box .stat-value { font-size: 0.9rem; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; }
 .mini-box .stat-sub  { font-size: 0.76rem; color: var(--muted); }
+
+/* ---- Action bar ---- */
+.action-bar {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+    margin-top: -0.25rem;
+}
+.btn-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+}
+.btn-action:hover { border-color: var(--accent); color: var(--text); background: var(--accent-dim); text-decoration: none; }
+.btn-action svg { flex-shrink: 0; }
 
 /* ---- Back-to-top button ---- */
 #totop {
@@ -572,13 +600,15 @@ def _render_html():
 
         <section class="card">
             <p class="card-title">Schedule</p>
-            <div class="stat-row">
-                <span class="stat-label">Cron expression</span>
-                <span class="stat-value"><code>{escape(cron_expr)}</code></span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-label">Human-readable</span>
-                <span class="stat-value">{escape(schedule_desc)}</span>
+            <div class="mini-grid">
+                <div class="mini-box" style="grid-column:1/-1">
+                    <span class="stat-label">Cron expression</span>
+                    <span class="stat-value"><code>{escape(cron_expr)}</code></span>
+                </div>
+                <div class="mini-box" style="grid-column:1/-1">
+                    <span class="stat-label">Human-readable</span>
+                    <span class="stat-value">{escape(schedule_desc)}</span>
+                </div>
             </div>
         </section>
 
@@ -606,6 +636,17 @@ def _render_html():
         </section>
 
     </div>
+
+    {f"""<div class="action-bar">
+        <a class="btn-action" href="/action/test-notify" onclick="return confirm('Send a test Telegram notification?')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+            Test notification
+        </a>
+        <a class="btn-action" href="/action/send-digest" onclick="return confirm('Send the accumulated digest now and clear it?')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+            Send digest now
+        </a>
+    </div>""" if tg_ok else ""}
 
     <section class="card">
         <div class="card-header">
@@ -684,19 +725,67 @@ window.addEventListener('scroll', function() {{
 # HTTP server
 # ---------------------------------------------------------------------------
 
+def _run_action(args):
+    """Run clean_email.py with given args, return (success, output)."""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "clean_email.py")
+    try:
+        result = subprocess.run(
+            [sys.executable, script] + args,
+            capture_output=True, text=True, timeout=30,
+        )
+        return result.returncode == 0, (result.stdout + result.stderr).strip()
+    except Exception as e:
+        return False, str(e)
+
+
+def _send_test_notification():
+    """Send a test Telegram message directly from the status server."""
+    import urllib.parse
+    import urllib.request
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("CLEAN_EMAIL_TELEGRAM_CHAT_ID") or os.getenv("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        return False, "Telegram not configured"
+    msg = f"Clean Mail Automation v{APP_VERSION} — test notification. Everything is working correctly."
+    api_url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = urllib.parse.urlencode({"chat_id": chat_id, "text": msg}).encode()
+    try:
+        with urllib.request.urlopen(
+            urllib.request.Request(api_url, data=payload, method="POST"), timeout=10
+        ) as r:
+            return r.status == 200, "sent" if r.status == 200 else f"HTTP {r.status}"
+    except Exception as e:
+        return False, str(e)
+
+
 class _StatusHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path not in ("/", "/status", "/index.html"):
+        if self.path in ("/", "/status", "/index.html"):
+            body = _render_html().encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        elif self.path == "/action/send-digest":
+            ok, out = _run_action(["--send-digest"])
+            print(f"[action/send-digest] ok={ok} {out}", flush=True)
+            self.send_response(302)
+            self.send_header("Location", "/")
+            self.end_headers()
+
+        elif self.path == "/action/test-notify":
+            ok, out = _send_test_notification()
+            print(f"[action/test-notify] ok={ok} {out}", flush=True)
+            self.send_response(302)
+            self.send_header("Location", "/")
+            self.end_headers()
+
+        else:
             self.send_response(404)
             self.end_headers()
-            return
-        body = _render_html().encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(body)
 
     def log_message(self, fmt, *args):  # suppress per-request access logs
         pass
