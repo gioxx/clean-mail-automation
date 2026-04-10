@@ -218,6 +218,10 @@ The status page is only started by `entrypoint.sh` inside the Docker container. 
 
 ### docker-compose example
 
+> Ready-to-use compose files are available in the [`examples/`](examples/) folder:
+> - [`docker-compose.single.yml`](examples/docker-compose.single.yml) — single mailbox with Telegram notifications
+> - [`docker-compose.multi.yml`](examples/docker-compose.multi.yml) — multi-mailbox with weekly digest notifications
+
 ```yaml
 services:
   email-cleaner:

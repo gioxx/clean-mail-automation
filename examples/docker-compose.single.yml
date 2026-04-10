@@ -1,0 +1,43 @@
+# docker-compose.single.yml
+# Single-mailbox example with Telegram notifications.
+#
+# Usage:
+#   cp examples/docker-compose.single.yml docker-compose.yml
+#   # Edit the values below, then:
+#   docker compose up -d
+#
+# Status page: http://localhost:8080
+
+services:
+  email-cleaner:
+    image: ghcr.io/gioxx/clean-mail-automation:latest
+    container_name: email-cleaner
+    restart: unless-stopped
+
+    environment:
+      # ── IMAP ──────────────────────────────────────────────────
+      - IMAP_SERVER=imap.example.com
+      - IMAP_PORT=993
+      - EMAIL_USER=youruser@example.com
+      - EMAIL_PASS=your_imap_password
+      - EMAIL_ADDRESS=youruser@example.com   # label used in logs/notifications
+      - MAILBOX=INBOX                        # IMAP folder to clean
+      - CLEAN_DAYS=10                        # delete emails older than N days
+
+      # ── Schedule (cron inside the container) ──────────────────
+      # Every Monday at 01:30
+      - SCHEDULE_DAY=1
+      - SCHEDULE_HOUR=1
+      - SCHEDULE_MIN=30
+
+      # ── Telegram notifications ─────────────────────────────────
+      - SEND_TELEGRAM_NOTIFICATIONS=true
+      - TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
+      - TELEGRAM_CHAT_ID=987654321
+      # Notify mode: "always" sends after every run
+      - TELEGRAM_NOTIFY_MODE=always
+      # Set to "true" to skip notifications when nothing was deleted
+      - TELEGRAM_NOTIFY_ONLY_IF_DELETED=false
+
+    ports:
+      - "8080:8080"   # web status page → http://localhost:8080

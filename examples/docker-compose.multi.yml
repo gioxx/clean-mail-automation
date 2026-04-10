@@ -1,0 +1,49 @@
+# docker-compose.multi.yml
+# Multi-mailbox example with Telegram digest notifications.
+#
+# Three mailboxes are cleaned in a single container run:
+#   - user1@example.com  →  INBOX,   delete after 10 days
+#   - user2@example.com  →  INBOX,   delete after 30 days
+#   - user3@other.com    →  Archive, delete after 60 days
+#
+# Notifications are sent as a weekly digest every Sunday at 08:00
+# and only when at least one email was actually deleted.
+#
+# Usage:
+#   cp examples/docker-compose.multi.yml docker-compose.yml
+#   # Edit the values below, then:
+#   docker compose up -d
+#
+# Status page: http://localhost:8080
+
+services:
+  email-cleaner:
+    image: ghcr.io/gioxx/clean-mail-automation:latest
+    container_name: email-cleaner-multi
+    restart: unless-stopped
+
+    environment:
+      # ── Multi-mailbox config (JSON array, must be on one line) ─
+      - MAILBOX_CONFIGS=[{"imap_server":"imap.example.com","imap_port":993,"email_user":"user1@example.com","email_pass":"pass_user1","email_address":"user1@example.com","mailbox":"INBOX","clean_days":10},{"imap_server":"imap.example.com","imap_port":993,"email_user":"user2@example.com","email_pass":"pass_user2","email_address":"user2@example.com","mailbox":"INBOX","clean_days":30},{"imap_server":"imap.other.com","imap_port":993,"email_user":"user3@other.com","email_pass":"pass_user3","email_address":"user3@other.com","mailbox":"Archive","clean_days":60}]
+
+      # ── Schedule (cron inside the container) ──────────────────
+      # Every day at 02:00
+      - SCHEDULE_DAY=*
+      - SCHEDULE_HOUR=2
+      - SCHEDULE_MIN=0
+
+      # ── Telegram notifications ─────────────────────────────────
+      - SEND_TELEGRAM_NOTIFICATIONS=true
+      - TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
+      - TELEGRAM_CHAT_ID=987654321
+      # Digest mode: accumulate results and send once a week
+      - TELEGRAM_NOTIFY_MODE=digest
+      # Only notify when something was actually deleted
+      - TELEGRAM_NOTIFY_ONLY_IF_DELETED=true
+      # Digest sent every Sunday at 08:00
+      - DIGEST_SCHEDULE_DAY=0
+      - DIGEST_SCHEDULE_HOUR=8
+      - DIGEST_SCHEDULE_MIN=0
+
+    ports:
+      - "8080:8080"   # web status page → http://localhost:8080
