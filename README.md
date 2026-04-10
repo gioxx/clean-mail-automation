@@ -4,6 +4,34 @@ A Docker container to automatically clean an IMAP email inbox by deleting all em
 
 ---
 
+## Table of Contents
+
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+  - [Running with Docker](#running-with-docker-recommended)
+  - [Running the script directly](#running-the-script-directly-without-docker)
+- [Getting Started](#getting-started)
+  - [Official Prebuilt Images](#official-prebuilt-images)
+  - [Option A: Run Official Prebuilt Image](#option-a-run-official-prebuilt-image-recommended)
+  - [Option B: Build Locally](#option-b-build-the-docker-image-locally)
+- [All Parameters](#all-parameters)
+  - [Environment Variables](#environment-variables-container--script)
+  - [CLI Arguments](#cli-arguments-clean_emailpy)
+  - [Scheduling Variables](#scheduling-environment-variables)
+- [Multi-Mailbox Mode](#multi-mailbox-mode)
+- [Web Status Page](#web-status-page)
+  - [docker-compose example — single mailbox](#docker-compose-example)
+  - [docker-compose example — multi-mailbox](#docker-compose-example--multi-mailbox)
+- [Telegram Notifications](#telegram-notifications)
+  - [Notification modes](#notification-modes)
+- [Project Structure](#project-structure)
+- [Logging](#logging)
+- [Customization](#customization)
+- [Contribution](#contribution)
+- [License](#license)
+
+---
+
 ## Features
 
 - Connects to any IMAP email server with specified credentials
