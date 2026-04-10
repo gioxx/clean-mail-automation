@@ -240,7 +240,7 @@ main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; display: grid; g
 .mini-box .stat-sub  { font-size: 0.76rem; color: var(--muted); }
 .mini-box-split { display: flex; gap: 0.5rem; align-items: stretch; }
 .mini-box-split .mini-box-main { flex: 1; display: flex; flex-direction: column; gap: 0.28rem; }
-.mini-actions { display: flex; flex-direction: column; gap: 0.35rem; justify-content: center; }
+.mini-actions { display: flex; flex-direction: column; gap: 0.35rem; justify-content: center; align-self: center; }
 
 /* ---- Action buttons ---- */
 .btn-action {
