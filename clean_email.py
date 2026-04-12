@@ -440,6 +440,15 @@ if __name__ == "__main__":
     for index, mailbox_config in enumerate(mailbox_configs, start=1):
         logging.info("Processing mailbox %s/%s.", index, len(mailbox_configs))
         if not validate_mailbox_config(mailbox_config):
+            results.append({
+                "mailbox_address": mailbox_config.get("email_address") or mailbox_config.get("email_user") or "unknown",
+                "mailbox_name": mailbox_config.get("mailbox", DEFAULT_MAILBOX),
+                "status": "error",
+                "deleted_count": 0,
+                "days": mailbox_config.get("clean_days", 0),
+                "duration_seconds": 0,
+                "error_message": "Missing required configuration (imap_server, email_user or email_pass).",
+            })
             continue
         result = delete_old_emails(mailbox_config)
         notify_cleanup_result(result)
