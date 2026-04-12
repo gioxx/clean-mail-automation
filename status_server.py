@@ -17,7 +17,7 @@ from html import escape
 
 STATE_FILE = "/tmp/clean_mail_last_run.json"
 DEFAULT_MAILBOX = "INBOX"
-APP_VERSION = "0.5"
+APP_VERSION = "0.5.1"
 
 
 # ---------------------------------------------------------------------------
