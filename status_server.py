@@ -189,6 +189,18 @@ main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; display: grid; g
 .grid-2 { display: grid; grid-template-columns: 35fr 65fr; gap: 1.25rem; }
 @media (max-width: 660px) { .grid-2 { grid-template-columns: 1fr; } }
 
+/* ---- Mobile ---- */
+@media (max-width: 540px) {
+    header { padding: 0.75rem 1rem; }
+    .meta { text-align: left; }
+    main { padding: 1rem 0.75rem; }
+    .mini-grid { grid-template-columns: 1fr; }
+    .mini-box { grid-column: 1 / -1 !important; }
+    table { min-width: unset; font-size: 0.78rem; }
+    thead th, tbody td { padding: 0.45rem 0.5rem; }
+    .guide-body table { min-width: 420px; }
+}
+
 /* ---- Stat rows ---- */
 .stat-row { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.9rem; }
 .stat-row:last-child { margin-bottom: 0; }
@@ -515,10 +527,8 @@ def _render_html():
                 f"<td class='{'cell-err' if error else 'cell-muted'}'>{escape(error) if error else '—'}</td>"
                 f"</tr>"
             )
-        last_run_html = f"""
-        <section class="card">
-            <p class="card-title">Last Run &nbsp;·&nbsp; {ts}</p>
-            <div class="table-wrap">
+        run_body = (
+            f"""<div class="table-wrap">
                 <table>
                     <thead>
                         <tr>
@@ -528,7 +538,14 @@ def _render_html():
                     </thead>
                     <tbody>{run_rows}</tbody>
                 </table>
-            </div>
+            </div>"""
+            if run_rows else
+            "<p class='empty'>Run recorded but no mailbox results found — check container logs for details.</p>"
+        )
+        last_run_html = f"""
+        <section class="card">
+            <p class="card-title">Last Run &nbsp;·&nbsp; {ts}</p>
+            {run_body}
         </section>"""
     else:
         last_run_html = """
