@@ -187,18 +187,24 @@ main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; display: grid; g
     margin-bottom: 1rem;
 }
 .grid-2 { display: grid; grid-template-columns: 35fr 65fr; gap: 1.25rem; }
-@media (max-width: 660px) { .grid-2 { grid-template-columns: 1fr; } }
+.grid-2 > * { min-width: 0; }
+main > * { min-width: 0; }
+@media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
 
 /* ---- Mobile ---- */
-@media (max-width: 540px) {
+@media (max-width: 640px) {
     header { padding: 0.75rem 1rem; }
     .meta { text-align: left; }
     main { padding: 1rem 0.75rem; }
     .mini-grid { grid-template-columns: 1fr; }
     .mini-box { grid-column: 1 / -1 !important; }
+    .mini-box-split { flex-wrap: wrap; }
+    .mini-actions { width: 100%; flex-direction: row; justify-content: flex-start; }
     table { min-width: unset; font-size: 0.78rem; }
     thead th, tbody td { padding: 0.45rem 0.5rem; }
     .guide-body table { min-width: 420px; }
+    .hide-mobile { display: none; }
+    #totop { width: 2.1rem; height: 2.1rem; font-size: 0.95rem; bottom: 1rem; right: 1rem; }
 }
 
 /* ---- Stat rows ---- */
@@ -500,7 +506,7 @@ def _render_html():
             f"<tr>"
             f"<td>{escape(str(mb['email_address']))}</td>"
             f"<td>{escape(str(mb['imap_server']))}</td>"
-            f"<td>{escape(str(mb['imap_port']))}</td>"
+            f"<td class='hide-mobile'>{escape(str(mb['imap_port']))}</td>"
             f"<td><code>{escape(str(mb['mailbox']))}</code></td>"
             f"<td>{escape(str(mb['clean_days']))} days</td>"
             f"</tr>"
@@ -523,7 +529,7 @@ def _render_html():
                 f"<td><code>{escape(str(r.get('mailbox_name', 'INBOX')))}</code></td>"
                 f"<td><span class='badge {badge}'>{escape(st)}</span></td>"
                 f"<td>{deleted}</td>"
-                f"<td>{float(duration):.2f}s</td>"
+                f"<td class='hide-mobile'>{float(duration):.2f}s</td>"
                 f"<td class='{'cell-err' if error else 'cell-muted'}'>{escape(error) if error else '—'}</td>"
                 f"</tr>"
             )
@@ -533,7 +539,7 @@ def _render_html():
                     <thead>
                         <tr>
                             <th>Mailbox</th><th>Folder</th><th>Status</th>
-                            <th>Deleted</th><th>Duration</th><th>Error</th>
+                            <th>Deleted</th><th class="hide-mobile">Duration</th><th>Error</th>
                         </tr>
                     </thead>
                     <tbody>{run_rows}</tbody>
@@ -683,7 +689,7 @@ def _render_html():
                     <tr>
                         <th>Email address</th>
                         <th>IMAP server</th>
-                        <th>Port</th>
+                        <th class="hide-mobile">Port</th>
                         <th>Folder</th>
                         <th>Retention</th>
                     </tr>
