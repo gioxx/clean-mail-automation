@@ -607,7 +607,7 @@ def _render_html():
 <header>
     <div class="logo">
         {_ENVELOPE_ICON}
-        <h1>Clean <em>Mail</em> Automation</h1>
+        <h1>Clean <em>Mail</em> <span class="hide-mobile">Automation</span></h1>
         <span class="badge badge-muted" style="font-size:0.68rem;margin-left:0.25rem">v{APP_VERSION}</span>
     </div>
     <div class="meta">
