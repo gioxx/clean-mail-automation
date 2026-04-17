@@ -17,7 +17,7 @@ from html import escape
 
 STATE_FILE = "/tmp/clean_mail_last_run.json"
 DEFAULT_MAILBOX = "INBOX"
-APP_VERSION = "0.5.2"
+APP_VERSION = "0.5.3"
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +161,9 @@ header {
     justify-content: space-between;
     gap: 1rem;
     flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 .logo { display: flex; align-items: center; gap: 0.6rem; }
 .logo svg { color: var(--accent); flex-shrink: 0; }
