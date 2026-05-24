@@ -2,6 +2,13 @@
 
 A Docker container to automatically clean an IMAP email inbox by deleting all emails older than a configurable number of days (default: 10). The cleanup runs periodically according to environment variables.
 
+[![](https://img.shields.io/github/issues/gioxx/clean-mail-automation.svg)](https://github.com/gioxx/clean-mail-automation/issues)
+[![](https://img.shields.io/github/issues-pr-raw/gioxx/clean-mail-automation.svg)](https://github.com/gioxx/clean-mail-automation/pulls)
+![MIT License](https://img.shields.io/github/license/gioxx/clean-mail-automation)
+![Docker](https://img.shields.io/badge/Docker-ready-blue?logo=docker)
+[![](https://img.shields.io/docker/pulls/gfsolone/clean-mail-automation.svg)](https://hub.docker.com/r/gfsolone/clean-mail-automation)
+[![](https://img.shields.io/docker/image-size/gfsolone/clean-mail-automation/latest.svg)](https://hub.docker.com/r/gfsolone/clean-mail-automation)
+
 ---
 
 ## Table of Contents

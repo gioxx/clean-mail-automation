@@ -1,25 +1,29 @@
-name: Issue & PR assignment
+name: Auto Assignment for Issues
+run-name: Auto Assignment for Issues
 
 on:
   issues:
     types: [opened]
-  # Reminder: 'pull_request' is for same-repo PRs; switch to 'pull_request_target' to handle PRs from forks/Dependabot.
-  pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
-
-permissions:
-  contents: read
-  issues: write # assign issues
-  pull-requests: write # assign PRs
 
 jobs:
-  auto-assign:
+  process-issue:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
     steps:
-      - name: Auto-assign issue/PR
-        uses: pozil/auto-assign-issue@v3.0.0
+      - name: Assign issue to repo owner
+        uses: actions/github-script@v9
         with:
-          # Reminder: can use also for multiple users, with weights (e.g., "gioxx:3,otheruser:1")
-          assignees: gioxx
-          numOfAssignee: 1
-          allowSelfAssign: true
+          script: |
+            try {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                assignees: [context.repo.owner]
+              });
+            } catch (error) {
+              core.setFailed(`Failed to assign issue: ${error.message}`);
+            }
