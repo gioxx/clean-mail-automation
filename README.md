@@ -5,7 +5,7 @@ A Docker container to automatically clean an IMAP email inbox by deleting all em
 [![](https://img.shields.io/github/issues/gioxx/clean-mail-automation.svg)](https://github.com/gioxx/clean-mail-automation/issues)
 [![](https://img.shields.io/github/issues-pr-raw/gioxx/clean-mail-automation.svg)](https://github.com/gioxx/clean-mail-automation/pulls)
 [![MIT License](https://img.shields.io/github/license/gioxx/clean-mail-automation)](https://github.com/gioxx/clean-mail-automation/blob/main/LICENSE)
-![Docker](https://img.shields.io/badge/Docker-ready-blue?logo=docker)
+[![](https://img.shields.io/badge/GHCR-available-blue?logo=docker)](https://github.com/users/gioxx/packages/container/package/clean-mail-automation)
 [![](https://img.shields.io/docker/pulls/gfsolone/clean-mail-automation.svg)](https://hub.docker.com/r/gfsolone/clean-mail-automation)
 [![](https://img.shields.io/docker/image-size/gfsolone/clean-mail-automation/latest.svg)](https://hub.docker.com/r/gfsolone/clean-mail-automation)
 
