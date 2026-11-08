@@ -17,7 +17,7 @@ from html import escape
 
 STATE_FILE = "/tmp/clean_mail_last_run.json"
 DEFAULT_MAILBOX = "INBOX"
-APP_VERSION = "0.5.3"
+APP_VERSION = "0.5.5"
 
 
 # ---------------------------------------------------------------------------
@@ -423,69 +423,87 @@ def _active_env_vars():
     return {k for k in candidates if os.getenv(k)}
 
 
-def _render_guide(active_vars):
-    """Return the collapsible env vars reference HTML."""
-    def row(var, default, desc):
-        dot = (
-            "<span class='dot dot-ok' title='Set in this container' "
-            "style='margin-right:0.35rem;vertical-align:middle'></span>"
-            if var in active_vars else
-            "<span class='dot dot-muted' title='Not configured' "
-            "style='margin-right:0.35rem;vertical-align:middle'></span>"
+# Variables shown in the "Active configuration" panel. Only the ones set
+# in this container are listed; defaults and descriptions live in the KB.
+_ENV_GROUPS = (
+    ("IMAP / Mailbox", ("MAILBOX_CONFIGS", "IMAP_SERVER", "IMAP_PORT", "EMAIL_USER", "EMAIL_PASS",
+                        "EMAIL_ADDRESS", "MAILBOX", "CLEAN_DAYS")),
+    ("Schedule", ("SCHEDULE_MIN", "SCHEDULE_HOUR", "SCHEDULE_DAY", "TZ")),
+    ("Telegram", ("SEND_TELEGRAM_NOTIFICATIONS", "TELEGRAM_BOT_TOKEN", "CLEAN_EMAIL_TELEGRAM_CHAT_ID",
+                  "TELEGRAM_CHAT_ID", "TELEGRAM_TIMEOUT", "TELEGRAM_NOTIFY_MODE",
+                  "TELEGRAM_NOTIFY_ONLY_IF_DELETED")),
+    ("Digest schedule", ("DIGEST_SCHEDULE_MIN", "DIGEST_SCHEDULE_HOUR", "DIGEST_SCHEDULE_DAY")),
+    ("Web", ("WEB_PORT",)),
+)
+# Never shown, even partially.
+_SECRET_VARS = frozenset({"EMAIL_PASS", "TELEGRAM_BOT_TOKEN"})
+_ENV_DOCS_URL = "https://kb.gioxx.org/Projects/clean-mail-automation#environment-variables"
+
+
+def _current_env_value(var):
+    """Value shown in the panel: secrets masked, MAILBOX_CONFIGS (which
+    holds passwords) summarised. None when the variable is not set."""
+    raw = os.getenv(var)
+    if not raw:
+        return None
+    if var in _SECRET_VARS:
+        return "set (hidden)"
+    if var == "MAILBOX_CONFIGS":
+        n = len(_get_mailbox_configs())
+        return f"{n} mailbox{'es' if n != 1 else ''}"
+    raw = raw.strip()
+    return raw if len(raw) <= 60 else raw[:57] + "\u2026"
+
+
+def _render_guide(active_vars=None):
+    """List the environment variables that are set, with their values."""
+    rows = ""
+    for label, names in _ENV_GROUPS:
+        group = [(n, _current_env_value(n)) for n in names]
+        group = [(n, v) for n, v in group if v is not None]
+        if not group:
+            continue
+        rows += f"<tr><td colspan='2' class='guide-section-label'>{escape(label)}</td></tr>"
+        rows += "".join(
+            f"<tr><td>{escape(n)}</td><td><code>{escape(v)}</code></td></tr>" for n, v in group
         )
-        return (
-            f"<tr><td>{dot}{escape(var)}</td>"
-            f"<td>{escape(str(default))}</td>"
-            f"<td>{desc}</td></tr>"
-        )
-
-    def section(label):
-        return f"<tr><td colspan='3' class='guide-section-label'>{escape(label)}</td></tr>"
-
-    rows = "".join([
-        section("IMAP / Mailbox"),
-        row("IMAP_SERVER",    "—",         "IMAP server hostname or IP. <strong>Required.</strong>"),
-        row("IMAP_PORT",      "993",        "IMAP SSL port."),
-        row("EMAIL_USER",     "—",         "<strong>Required.</strong> Username for IMAP login."),
-        row("EMAIL_PASS",     "—",         "<strong>Required.</strong> Password for IMAP login."),
-        row("EMAIL_ADDRESS",  "EMAIL_USER", "Display label used in logs and notifications."),
-        row("MAILBOX",        "INBOX",      "IMAP folder to clean."),
-        row("CLEAN_DAYS",     "10",         "Delete emails older than this many days. Overridden by <code>--days</code> CLI argument."),
-        row("MAILBOX_CONFIGS","—",          "JSON array for multi-mailbox mode. Each entry: <code>imap_server</code>, <code>email_user</code>, <code>email_pass</code>, and optionally <code>imap_port</code>, <code>email_address</code>, <code>mailbox</code>, <code>clean_days</code>."),
-        section("Schedule (cron)"),
-        row("SCHEDULE_MIN",   "0",  "Cron minute (0–59)."),
-        row("SCHEDULE_HOUR",  "0",  "Cron hour (0–23)."),
-        row("SCHEDULE_DAY",   "0",  "Cron weekday — 0/7 = Sunday … 6 = Saturday. Use <code>*</code> for every day."),
-        section("Telegram Notifications"),
-        row("SEND_TELEGRAM_NOTIFICATIONS", "false", "Enable Telegram notifications. Accepted: <code>1</code>, <code>true</code>, <code>yes</code>, <code>on</code>."),
-        row("TELEGRAM_BOT_TOKEN",          "—",     "Bot token from @BotFather. Required when notifications are enabled."),
-        row("TELEGRAM_CHAT_ID",            "—",     "Chat ID to send notifications to."),
-        row("CLEAN_EMAIL_TELEGRAM_CHAT_ID","—",     "Alternative chat ID; takes priority over <code>TELEGRAM_CHAT_ID</code>."),
-        row("TELEGRAM_TIMEOUT",            "10",    "Timeout in seconds for Telegram API calls."),
-        row("TELEGRAM_NOTIFY_MODE",        "always","<code>always</code>: notify after every run. <code>digest</code>: accumulate results and send on a separate schedule."),
-        row("TELEGRAM_NOTIFY_ONLY_IF_DELETED","false","When <code>true</code>, skip notifications for runs where no emails were deleted."),
-        section("Digest Schedule (TELEGRAM_NOTIFY_MODE=digest only)"),
-        row("DIGEST_SCHEDULE_MIN",  "0", "Cron minute for the digest send."),
-        row("DIGEST_SCHEDULE_HOUR", "8", "Cron hour for the digest send."),
-        row("DIGEST_SCHEDULE_DAY",  "0", "Cron weekday for the digest send (same format as <code>SCHEDULE_DAY</code>)."),
-        section("Web Status Page"),
-        row("WEB_PORT", "8080", "Internal port for the status page. Always started by the container; override only if 8080 conflicts."),
-        section("Timezone"),
-        row("TZ", "UTC", "Container timezone. Affects all timestamps written by the script (e.g. Last Run). Example: <code>Europe/Rome</code>, <code>America/New_York</code>. The status page clock always uses the browser's local time regardless of this setting."),
-    ])
-
+    if not rows:
+        rows = "<tr><td colspan='2'>No variables set: every setting uses its default.</td></tr>"
     return f"""
     <details>
-        <summary>Environment Variables Reference</summary>
+        <summary>Active configuration</summary>
         <div class="guide-body">
+            <p style="color:var(--muted);font-size:.8rem;margin:0 0 .75rem">
+                Environment variables set for this container. Anything not listed uses its default;
+                see the <a href="{_ENV_DOCS_URL}" target="_blank" rel="noopener">documentation</a>
+                for every variable and its default.
+            </p>
             <table>
                 <thead>
-                    <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+                    <tr><th>Variable</th><th>Value</th></tr>
                 </thead>
                 <tbody>{rows}</tbody>
             </table>
         </div>
     </details>"""
+
+
+def _startup_summary():
+    """Effective configuration for the container log. Never prints secrets."""
+    lines = [f"clean-mail-automation v{APP_VERSION}"]
+    for mb in _get_mailbox_configs():
+        lines.append(
+            f"mailbox {mb.get('email_address')}: {mb.get('imap_server')}:{mb.get('imap_port')}, "
+            f"folder {mb.get('mailbox')}, delete after {mb.get('clean_days')} day(s)"
+        )
+    cron_expr, description = _get_schedule()
+    lines.append(f"schedule: {cron_expr} ({description}), TZ={os.getenv('TZ') or 'UTC'}")
+    enabled, detail, mode, only_if_deleted = _telegram_status()
+    lines.append(
+        f"telegram: on, mode {mode}{', only when something was deleted' if only_if_deleted else ''}"
+        if enabled else f"telegram: off ({detail})"
+    )
+    return lines
 
 
 _ENVELOPE_ICON = """<svg width="22" height="22" viewBox="0 0 24 24" fill="none"
@@ -744,9 +762,15 @@ window.addEventListener('scroll', function() {{
 </script>
 
 <footer>
-    <a href="https://github.com/gioxx/clean-mail-automation" target="_blank" rel="noopener">
-        gioxx/clean-mail-automation
-    </a>
+    <a href="https://kb.gioxx.org/Projects/clean-mail-automation" target="_blank" rel="noopener">Documentation</a>
+    &nbsp;&middot;&nbsp;
+    <a href="https://github.com/gioxx/clean-mail-automation/releases/tag/{APP_VERSION}" target="_blank" rel="noopener"><code>v{APP_VERSION}</code></a>
+    &nbsp;&middot;&nbsp;
+    <a href="https://github.com/gioxx/clean-mail-automation/issues" target="_blank" rel="noopener">Report an issue</a>
+    &nbsp;&middot;&nbsp;
+    <a href="https://github.com/gioxx/clean-mail-automation" target="_blank" rel="noopener">GitHub</a>
+    &nbsp;&middot;&nbsp;
+    <a href="https://kb.gioxx.org/Projects/spam-digest" target="_blank" rel="noopener">Spam-Digest</a>
     &nbsp;&middot;&nbsp; MIT License
 </footer>
 
@@ -837,4 +861,6 @@ if __name__ == "__main__":
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", port), _StatusHandler) as httpd:
         print(f"Status server listening on port {port}", flush=True)
+        for line in _startup_summary():
+            print(f"[config] {line}", flush=True)
         httpd.serve_forever()
