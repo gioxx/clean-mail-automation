@@ -2,6 +2,8 @@
 
 A Docker container to automatically clean an IMAP email inbox by deleting all emails older than a configurable number of days (default: 10). The cleanup runs periodically according to environment variables.
 
+**Documentation:** [kb.gioxx.org/Projects/clean-mail-automation](https://kb.gioxx.org/Projects/clean-mail-automation)
+
 [![](https://img.shields.io/github/issues/gioxx/clean-mail-automation.svg)](https://github.com/gioxx/clean-mail-automation/issues)
 [![](https://img.shields.io/github/issues-pr-raw/gioxx/clean-mail-automation.svg)](https://github.com/gioxx/clean-mail-automation/pulls)
 [![MIT License](https://img.shields.io/github/license/gioxx/clean-mail-automation)](https://github.com/gioxx/clean-mail-automation/blob/main/LICENSE)
@@ -402,3 +404,9 @@ Contributions, issues, and feature requests are welcome! Feel free to fork the r
 ## License
 
 This project is licensed under the MIT License.
+
+---
+
+## Related projects
+
+- [spam-digest](https://github.com/gioxx/spam-digest) ([docs](https://kb.gioxx.org/Projects/spam-digest)): daily digest of IMAP spam folders with optional AI triage, to rescue real email wrongly flagged as spam
