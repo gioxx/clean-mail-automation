@@ -17,7 +17,7 @@ from html import escape
 
 STATE_FILE = "/tmp/clean_mail_last_run.json"
 DEFAULT_MAILBOX = "INBOX"
-APP_VERSION = "0.5.5"
+APP_VERSION = "0.5.6"
 
 
 # ---------------------------------------------------------------------------
@@ -25,37 +25,18 @@ APP_VERSION = "0.5.5"
 # ---------------------------------------------------------------------------
 
 def _get_mailbox_configs():
-    """Return list of mailbox dicts (passwords redacted) from env vars."""
-    raw = os.getenv("MAILBOX_CONFIGS")
-    if raw:
-        try:
-            configs = json.loads(raw)
-            if isinstance(configs, list) and configs:
-                result = []
-                for cfg in configs:
-                    if not isinstance(cfg, dict):
-                        continue
-                    email_user = cfg.get("email_user") or cfg.get("EMAIL_USER") or ""
-                    result.append({
-                        "email_address": cfg.get("email_address") or cfg.get("EMAIL_ADDRESS") or email_user,
-                        "imap_server": cfg.get("imap_server") or cfg.get("IMAP_SERVER") or "",
-                        "imap_port": cfg.get("imap_port") or cfg.get("IMAP_PORT") or 993,
-                        "mailbox": cfg.get("mailbox") or cfg.get("MAILBOX") or DEFAULT_MAILBOX,
-                        "clean_days": cfg.get("clean_days") or cfg.get("CLEAN_DAYS") or os.getenv("CLEAN_DAYS", 10),
-                    })
-                if result:
-                    return result
-        except (json.JSONDecodeError, Exception):
-            pass
+    """Mailbox configs exactly as clean_email.py resolves them (same defaults,
+    same handling of invalid or zero values), with passwords removed.
 
-    email_user = os.getenv("EMAIL_USER", "")
-    return [{
-        "email_address": os.getenv("EMAIL_ADDRESS") or email_user,
-        "imap_server": os.getenv("IMAP_SERVER", ""),
-        "imap_port": os.getenv("IMAP_PORT", 993),
-        "mailbox": os.getenv("MAILBOX", DEFAULT_MAILBOX),
-        "clean_days": os.getenv("CLEAN_DAYS", 10),
-    }]
+    The status page and its startup log must show what the cleanup really
+    uses; a separate parser here used to disagree on invalid IMAP_PORT /
+    CLEAN_DAYS values and on zeros inside MAILBOX_CONFIGS.
+    """
+    import clean_email
+    return [
+        {k: v for k, v in cfg.items() if k != "email_pass"}
+        for cfg in clean_email.load_mailbox_configs(None)
+    ]
 
 
 def _get_schedule():
