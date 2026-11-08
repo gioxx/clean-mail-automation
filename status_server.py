@@ -17,7 +17,7 @@ from html import escape
 
 STATE_FILE = "/tmp/clean_mail_last_run.json"
 DEFAULT_MAILBOX = "INBOX"
-APP_VERSION = "0.5.6"
+APP_VERSION = "0.5.7"
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +387,8 @@ footer {
     border-top: 1px solid var(--border);
     margin-top: 1rem;
 }
+footer .sep { margin: 0 .45rem; opacity: .6; }
+footer .ver { font-family: var(--mono); }
 """
 
 def _active_env_vars():
@@ -485,6 +487,25 @@ def _startup_summary():
         if enabled else f"telegram: off ({detail})"
     )
     return lines
+
+
+def _footer_links():
+    """Footer links, same layout as Spam-Digest's web UI."""
+    links = (
+        ("https://kb.gioxx.org/Projects/clean-mail-automation", "Documentation"),
+        (f"https://github.com/gioxx/clean-mail-automation/releases/tag/{APP_VERSION}", None),
+        ("https://github.com/gioxx/clean-mail-automation/issues", "Report an issue"),
+        ("https://github.com/gioxx/clean-mail-automation", "GitHub"),
+    )
+    parts = []
+    for href, label in links:
+        text = f"<span class='ver'>v{escape(APP_VERSION)}</span>" if label is None else escape(label)
+        parts.append(f"<a href='{href}' target='_blank' rel='noopener'>{text}</a>")
+    parts.append("MIT License")
+    return "<span class='sep'>&middot;</span>".join(parts)
+
+
+_FOOTER_LINKS = _footer_links()
 
 
 _ENVELOPE_ICON = """<svg width="22" height="22" viewBox="0 0 24 24" fill="none"
@@ -742,18 +763,7 @@ window.addEventListener('scroll', function() {{
 }})();
 </script>
 
-<footer>
-    <a href="https://kb.gioxx.org/Projects/clean-mail-automation" target="_blank" rel="noopener">Documentation</a>
-    &nbsp;&middot;&nbsp;
-    <a href="https://github.com/gioxx/clean-mail-automation/releases/tag/{APP_VERSION}" target="_blank" rel="noopener"><code>v{APP_VERSION}</code></a>
-    &nbsp;&middot;&nbsp;
-    <a href="https://github.com/gioxx/clean-mail-automation/issues" target="_blank" rel="noopener">Report an issue</a>
-    &nbsp;&middot;&nbsp;
-    <a href="https://github.com/gioxx/clean-mail-automation" target="_blank" rel="noopener">GitHub</a>
-    &nbsp;&middot;&nbsp;
-    <a href="https://kb.gioxx.org/Projects/spam-digest" target="_blank" rel="noopener">Spam-Digest</a>
-    &nbsp;&middot;&nbsp; MIT License
-</footer>
+<footer>{_FOOTER_LINKS}</footer>
 
 </body>
 </html>"""
